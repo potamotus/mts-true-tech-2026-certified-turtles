@@ -1,0 +1,23 @@
+[project]
+name = "certified-turtles"
+version = "0.1.0"
+description = "GPTHub / True Tech — backend и интеграция MWS GPT"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.6",
+    "uvicorn[standard]>=0.32.1",
+]
+
+[project.urls]
+Repository = "https://github.com/potamotus/mts-true-tech-2026-certified-turtles"
+
+[build-system]
+requires = ["hatchling>=1.26.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mws_gpt", "backend"]
+
+[tool.uv]
+package = true

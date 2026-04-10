@@ -85,3 +85,6 @@ Behavioral guidelines to reduce common LLM coding mistakes, derived from [Andrej
 
 Connected to Vercel. Every push to `main` = auto-deploy.
 Preview: https://mts-true-hack-certified-turtles.vercel.app
+
+
+Architecture:
