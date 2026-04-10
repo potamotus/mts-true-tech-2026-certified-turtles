@@ -9,7 +9,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
-import { useEffect, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { EditorToolbar } from './EditorToolbar'
 import { SlashCommand } from './extensions/SlashCommand'
 import { WikiLink } from './extensions/WikiLink'
@@ -36,16 +36,19 @@ export function CollaborativeEditor({
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [isTablePickerOpen, setIsTablePickerOpen] = useState(false)
 
+  const displayName = userName || `User-${Math.floor(Math.random() * 1000)}`
+  const userColor = useMemo(() => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), [])
+
   const { ydoc, provider, isConnected, collaborators } = useCollaboration(
     documentId,
-    userName
+    displayName
   )
 
-  const editor = useEditor({
-    extensions: [
+  const extensions = useMemo(() => {
+    const exts = [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-        history: false, // Disable history when using collaboration
+        history: false,
       }),
       Underline,
       TextAlign.configure({
@@ -79,20 +82,32 @@ export function CollaborativeEditor({
       Collaboration.configure({
         document: ydoc,
       }),
-      CollaborationCursor.configure({
-        provider: provider!,
-        user: {
-          name: userName || `User-${Math.floor(Math.random() * 1000)}`,
-          color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-        },
-      }),
-    ],
+    ]
+
+    // Only add cursor extension when provider is ready
+    if (provider) {
+      exts.push(
+        CollaborationCursor.configure({
+          provider,
+          user: {
+            name: displayName,
+            color: userColor,
+          },
+        })
+      )
+    }
+
+    return exts
+  }, [ydoc, provider, displayName, userColor, onNavigateToPage])
+
+  const editor = useEditor({
+    extensions,
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px]',
       },
     },
-  }, [ydoc, provider])
+  }, [extensions])
 
   return (
     <div className="bg-white flex flex-col h-full relative">
