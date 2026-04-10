@@ -1,0 +1,35 @@
+{
+  "tasks": {
+    "task-1775833588901-01gdhl": {
+      "taskId": "task-1775833588901-01gdhl",
+      "type": "bug-fix",
+      "description": "Debug frontend: check why page doesn't work after enabling ENABLE_COLLABORATION=true. Check TypeScript errors, runtime errors, and Docker logs.",
+      "priority": "normal",
+      "status": "in_progress",
+      "progress": 0,
+      "assignedTo": [
+        "frontend-debugger"
+      ],
+      "tags": [],
+      "createdAt": "2026-04-10T15:06:28.901Z",
+      "startedAt": "2026-04-10T15:06:36.193Z",
+      "completedAt": null
+    },
+    "task-1775834591208-4wq1t0": {
+      "taskId": "task-1775834591208-4wq1t0",
+      "type": "bug-fix",
+      "description": "Debug CollaborativeEditor: check why frontend breaks when ENABLE_COLLABORATION=true",
+      "priority": "high",
+      "status": "in_progress",
+      "progress": 0,
+      "assignedTo": [
+        "frontend-fixer"
+      ],
+      "tags": [],
+      "createdAt": "2026-04-10T15:23:11.208Z",
+      "startedAt": "2026-04-10T15:23:19.537Z",
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

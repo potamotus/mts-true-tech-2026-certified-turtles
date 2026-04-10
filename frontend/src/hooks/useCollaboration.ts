@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 
@@ -27,38 +27,38 @@ export function useCollaboration(
   const [isConnected, setIsConnected] = useState(false)
   const [collaborators, setCollaborators] = useState<CollaboratorInfo[]>([])
   const [isSynced, setIsSynced] = useState(false)
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null)
 
   const ydoc = useMemo(() => new Y.Doc(), [])
-  const providerRef = useRef<WebsocketProvider | null>(null)
 
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:4000/ws'
 
-    const provider = new WebsocketProvider(wsUrl, documentId, ydoc, {
+    const newProvider = new WebsocketProvider(wsUrl, documentId, ydoc, {
       connect: true,
     })
 
-    providerRef.current = provider
+    setProvider(newProvider)
 
     // Set user info
     const userColor = getRandomColor()
-    provider.awareness.setLocalStateField('user', {
+    newProvider.awareness.setLocalStateField('user', {
       name: userName,
       color: userColor,
     })
 
     // Track connection status
-    provider.on('status', ({ status }: { status: string }) => {
+    newProvider.on('status', ({ status }: { status: string }) => {
       setIsConnected(status === 'connected')
     })
 
-    provider.on('sync', (synced: boolean) => {
+    newProvider.on('sync', (synced: boolean) => {
       setIsSynced(synced)
     })
 
     // Track collaborators
     const updateCollaborators = () => {
-      const states = provider.awareness.getStates()
+      const states = newProvider.awareness.getStates()
       const collabs: CollaboratorInfo[] = []
 
       states.forEach((state, clientId) => {
@@ -73,18 +73,18 @@ export function useCollaboration(
       setCollaborators(collabs)
     }
 
-    provider.awareness.on('change', updateCollaborators)
+    newProvider.awareness.on('change', updateCollaborators)
     updateCollaborators()
 
     return () => {
-      provider.awareness.off('change', updateCollaborators)
-      provider.destroy()
+      newProvider.awareness.off('change', updateCollaborators)
+      newProvider.destroy()
     }
   }, [documentId, userName, ydoc])
 
   return {
     ydoc,
-    provider: providerRef.current,
+    provider,
     isConnected,
     isSynced,
     collaborators,
