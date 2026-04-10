@@ -19,6 +19,7 @@ services:
       - "${OPEN_WEBUI_PORT:-3000}:8080"
     volumes:
       - open-webui-data:/app/backend/data
+      - ./functions:/app/backend/data/functions
     env_file:
       - path: .env
         required: false
@@ -36,6 +37,15 @@ services:
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-ru-RU}
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-production}
       WEBUI_URL: ${WEBUI_URL:-http://localhost:3000}
+      # GPTHub Memory System
+      ENABLE_FUNCTIONS: "True"
+      MWS_GPT_API_KEY: ${MWS_GPT_API_KEY:-}
+      MEMORY_EXTRACTION_MODEL: ${MEMORY_EXTRACTION_MODEL:-mws-gpt-alpha}
+      MEMORY_CONFIDENCE_THRESHOLD: ${MEMORY_CONFIDENCE_THRESHOLD:-0.7}
+      MEMORY_BATCH_SIZE: ${MEMORY_BATCH_SIZE:-5}
+      MEMORY_BATCH_TIMEOUT_SEC: ${MEMORY_BATCH_TIMEOUT_SEC:-300}
+      MEMORY_MAX_MEMORIES: ${MEMORY_MAX_MEMORIES:-5}
+      MEMORY_MAX_TOKENS: ${MEMORY_MAX_TOKENS:-2000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
