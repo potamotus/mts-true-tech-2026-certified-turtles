@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient, MWSGPTError
+from .client import DEFAULT_BASE_URL, MWSGPTClient, MWSGPTError
 
 
 def _print_json(data: object) -> None:

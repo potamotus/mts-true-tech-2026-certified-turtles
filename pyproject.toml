@@ -17,7 +17,10 @@ requires = ["hatchling>=1.26.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mws_gpt", "backend"]
+packages = ["src/certified_turtles"]
+
+[project.scripts]
+mws-gpt = "certified_turtles.mws_gpt.__main__:main"
 
 [tool.uv]
 package = true

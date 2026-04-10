@@ -14,7 +14,5 @@ out
 *.md
 !README.md
 docs
-frontend
-assets
 *.tsbuildinfo
 .DS_Store
