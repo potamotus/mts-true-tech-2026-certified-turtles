@@ -20,6 +20,12 @@
 
 Полные URL: `https://api.gpt.mws.ru` + путь из таблицы.
 
+### Доступ к моделям (команда / ключ API)
+
+Список моделей в `GET /v1/models` — **глобальный каталог**. Фактический вызов разрешён только для моделей из **allowlist команды**, привязанной к API-ключу. Иначе ответ **`401`** с типом вроде `team_model_access_denied` и перечнем разрешённых `id`. Подставляйте в `model` значение из этого списка или уточняйте у администратора ключа.
+
+**Пример для хакатон-ключа:** в запросах чата/комплишенов удобно использовать `mws-gpt-alpha` (если она есть в выдаче ошибки или в `GET /v1/models` для вашего ключа).
+
 ---
 
 ## 2. Листинг моделей
@@ -88,7 +94,7 @@ curl -X POST "https://api.gpt.mws.ru/v1/chat/completions" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mts-anya",
+    "model": "mws-gpt-alpha",
     "messages": [
       {"role": "system", "content": "Ты помощник"},
       {"role": "user", "content": "Привет, как дела?"}
@@ -134,7 +140,7 @@ curl -X POST "https://api.gpt.mws.ru/v1/completions" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mts-anya",
+    "model": "mws-gpt-alpha",
     "prompt": "Что такое искусственный интеллект?",
     "temperature": 0.6,
     "max_tokens": 150,
@@ -203,7 +209,7 @@ curl -X POST "https://api.gpt.mws.ru/v1/embeddings" \
 - `cotype-preview-32k`
 - `bge-m3` — для эмбеддингов
 
-В примерах запросов также встречаются **`mts-anya`**, в ответах — варианты написания вроде `mts_anya`; при интеграции сверяйте точное имя с ответом `GET /v1/models` или с выдачей провайдера.
+В старых материалах встречалось имя **`mts-anya`** — у многих команд к нему **нет доступа**; ориентируйтесь на allowlist в ошибке `team_model_access_denied` или на `GET /v1/models` для вашего ключа. Имена чувствительны к регистру и написанию (`mws-gpt-alpha` ≠ другое имя).
 
 ### Оценка токенов (из документа)
 
