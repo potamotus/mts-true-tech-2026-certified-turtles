@@ -22,5 +22,12 @@ packages = ["src/certified_turtles"]
 [project.scripts]
 mws-gpt = "certified_turtles.mws_gpt.__main__:main"
 
+[project.optional-dependencies]
+# pydub на 3.13+: stdlib audioop удалён; на 3.12 пакет не ставим (там audioop ещё есть).
+openwebui = [
+    "open-webui>=0.6",
+    "audioop-lts>=0.2; python_version>='3.13'",
+]
+
 [tool.uv]
 package = true

@@ -1,4 +1,5 @@
 services:
+  # Опционально: ваш FastAPI (прокси / будущая логика). UI — в open-webui.
   api:
     build: .
     ports:
@@ -10,3 +11,34 @@ services:
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
     restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.8.5
+    container_name: open-webui
+    ports:
+      - "${OPEN_WEBUI_PORT:-3000}:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Только внешний OpenAI-совместимый API (MWS GPT). Ollama не используем.
+      ENABLE_OLLAMA_API: "False"
+      ENABLE_OPENAI_API: "True"
+      OPENAI_API_KEY: ${MWS_API_KEY:-}
+      OPENAI_API_BASE_URL: ${MWS_API_BASE:-https://api.gpt.mws.ru}/v1
+      # Все модели из ответа MWS /v1/models видны в селекторе; без ограничений «workspace».
+      BYPASS_MODEL_ACCESS_CONTROL: "True"
+      # Чтобы правки .env применялись после перезапуска без чистки тома (удобно на хакатоне).
+      ENABLE_PERSISTENT_CONFIG: "False"
+      WEBUI_NAME: ${WEBUI_NAME:-GPTHub}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-ru-RU}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-production}
+      WEBUI_URL: ${WEBUI_URL:-http://localhost:3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  open-webui-data: {}

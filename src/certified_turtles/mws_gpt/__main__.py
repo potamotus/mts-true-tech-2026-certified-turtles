@@ -12,10 +12,10 @@ def _print_json(data: object) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
-def _load_env_file(path: str) -> None:
-    """Подгружает KEY=VALUE из .env в os.environ (простой парсер, без кавычек)."""
+def _parse_env_file(path: str) -> dict[str, str]:
+    out: dict[str, str] = {}
     if not os.path.isfile(path):
-        return
+        return out
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -25,8 +25,32 @@ def _load_env_file(path: str) -> None:
                 continue
             key, _, val = line.partition("=")
             key, val = key.strip(), val.strip()
-            if key and key not in os.environ:
-                os.environ[key] = val
+            if key:
+                out[key] = val
+    return out
+
+
+def _find_project_root(start: str | None = None) -> str | None:
+    d = os.path.abspath(start or os.getcwd())
+    while True:
+        if os.path.isfile(os.path.join(d, "pyproject.toml")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def _load_env_files() -> None:
+    """Подтягивает .env: корень репо (рядом с pyproject.toml), затем cwd; cwd перекрывает файл из корня. Не затирает переменные из shell."""
+    merged: dict[str, str] = {}
+    root = _find_project_root()
+    if root:
+        merged.update(_parse_env_file(os.path.join(root, ".env")))
+    merged.update(_parse_env_file(os.path.join(os.getcwd(), ".env")))
+    for key, val in merged.items():
+        if key not in os.environ:
+            os.environ[key] = val
 
 
 def cmd_models(_args: argparse.Namespace, client: MWSGPTClient) -> int:
@@ -64,7 +88,7 @@ def cmd_embed(args: argparse.Namespace, client: MWSGPTClient) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _load_env_file(os.path.join(os.getcwd(), ".env"))
+    _load_env_files()
 
     parser = argparse.ArgumentParser(
         description="MWS GPT API: модели, чат, completion, embeddings (см. MWS-GPT.md)",

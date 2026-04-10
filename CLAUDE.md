@@ -76,6 +76,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **timsonyk** — collaborator
 
 ### Rules
+- **Shell / терминал:** не запускать команды «в никуда» — всегда дождаться завершения и показать пользователю полный вывод (stdout/stderr); не прятать логи за фоновым запуском без явной необходимости и без доступа к выводу.
 - Feature branches only, never push to main directly
 - One task = one branch = one PR
 - Build/lint must pass before PR
