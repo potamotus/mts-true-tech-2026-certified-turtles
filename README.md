@@ -51,7 +51,7 @@ Wiki module where text and tables become a unified tool for collaborative work a
 
 ## Team Workflow
 
-1. **Clone:** `git clone https://github.com/potamotus/hackathon-starter.git`
+1. **Clone:** `git clone https://github.com/potamotus/mts-true-tech-2026-certified-turtles.git`
 2. **Branch:** `git checkout -b feature/<name>`
 3. **Work → Commit → Push → PR** into `main`
 4. **Review:** at least 1 approve before merge
@@ -59,4 +59,4 @@ Wiki module where text and tables become a unified tool for collaborative work a
 ## Deploy
 
 Connected to Vercel. Every push to `main` = auto-deploy.
-Preview: https://hackathon-starter-joap2ldyy-motapotavs-projects.vercel.app
+Preview: https://mts-true-hack-certified-turtles.vercel.app
