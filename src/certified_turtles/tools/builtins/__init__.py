@@ -3,4 +3,6 @@
 from __future__ import annotations
 
 from . import fetch_url as fetch_url  # noqa: F401
+from . import generate_image as generate_image  # noqa: F401
+from . import generate_presentation as generate_presentation  # noqa: F401
 from . import web_search as web_search  # noqa: F401
