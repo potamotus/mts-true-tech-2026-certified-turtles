@@ -11,6 +11,10 @@ services:
     environment:
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
+      GENERATED_FILES_DIR: /data/generated
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+    volumes:
+      - generated-files:/data/generated
     restart: unless-stopped
 
   open-webui:
@@ -31,6 +35,11 @@ services:
       ENABLE_OPENAI_API: "True"
       OPENAI_API_KEY: ${MWS_API_KEY:-}
       OPENAI_API_BASE_URL: http://api:8000/v1
+      # Голос и live-режим (Call): STT/TTS через Web Speech API в браузере — без серверных моделей.
+      # MWS не даёт audio-эндпоинтов, поэтому используем встроенный движок браузера.
+      AUDIO_STT_ENGINE: "web"
+      AUDIO_TTS_ENGINE: "web"
+      ENABLE_AUDIO_CONVERSATION: "True"
       # Все модели из ответа MWS /v1/models видны в селекторе; без ограничений «workspace».
       BYPASS_MODEL_ACCESS_CONTROL: "True"
       # Чтобы правки .env применялись после перезапуска без чистки тома (удобно на хакатоне).
@@ -45,3 +54,4 @@ services:
 
 volumes:
   open-webui-data: {}
+  generated-files: {}

@@ -101,7 +101,27 @@ Architecture:
    - `GET /health`
    - `GET /v1/models`, `POST /v1/chat/completions` — OpenAI-совместимый прокси для Open WebUI (`stream` поддерживается псевдо-чанком).
    - `POST /api/v1/agent/chat` — наш собственный шейп агент-цикла (оставлен для CLI/скриптов).
+   - `GET /files/{filename}` — раздача файлов, сгенерированных тулами (например `.pptx` от `generate_presentation`). В docker-compose монтируется том `generated-files:/data/generated`.
    CLI: `uv run mws-gpt agent --model <id> -p "…"`.
+
+### Доступные тулы и под-агенты
+
+Примитивные тулы (`register_tool`, подключаются автоматически):
+
+- **`web_search`** — текстовый поиск в DuckDuckGo (`ddgs`). Отбрасывает URL-запросы и подсказывает вызвать `fetch_url`.
+- **`fetch_url`** — скачивание страницы и преобразование HTML→text (stdlib, без браузера).
+- **`generate_image`** — генерация картинки через Pollinations.ai (free-tier, без ключа). Возвращает URL и готовую markdown-вставку `![](…)`, которую Open WebUI рендерит инлайн.
+- **`generate_presentation`** — сборка настоящего `.pptx` через `python-pptx`. Файл пишется в `GENERATED_FILES_DIR`, раздаётся через `/files/{name}.pptx`, URL строится из `PUBLIC_API_BASE_URL`.
+
+Под-агенты (`agents/registry.py`, вызываются родительским LLM как `agent_{id}`):
+
+- **`agent_research`** — быстрый ресёрч: `web_search` + `fetch_url`.
+- **`agent_writer`** — только текст, без внешних инструментов (сокращение/переписывание).
+- **`agent_deep_research`** — многошаговое глубокое исследование: декомпозирует вопрос, итеративно ходит `web_search` → `fetch_url`, в конце отдаёт markdown-отчёт (TL;DR, ключевые выводы, источники). До 16 внутренних раундов.
+
+### Голос и live-режим
+
+MWS GPT не предоставляет audio-эндпоинтов, поэтому STT/TTS не проксируется через бэкенд — вместо этого в `docker-compose.yml` включены переменные Open WebUI `AUDIO_STT_ENGINE=web`, `AUDIO_TTS_ENGINE=web`, `ENABLE_AUDIO_CONVERSATION=True`. Это активирует **Web Speech API** в браузере: распознавание голоса и синтез речи — клиентсайдом. Кнопка «Call» в Open WebUI даёт непрерывный голосовой диалог (live-режим) поверх нашего tool-агента.
 
 **Без Docker (только uv):** из **корня репозитория** — `uv sync --extra openwebui`. В `.env` должен быть `MWS_API_KEY`. Перед запуском WebUI экспортируйте MWS в переменные, которые ждёт Open WebUI (в одной оболочке):
 

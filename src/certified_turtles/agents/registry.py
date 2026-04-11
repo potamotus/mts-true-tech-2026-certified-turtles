@@ -23,6 +23,7 @@ class SubAgentSpec:
 # Имена тулов под-агента — из реестра примитивов (`register_tool`, см. tools/builtins).
 RESEARCH_AGENT_ID = "research"
 WRITER_AGENT_ID = "writer"
+DEEP_RESEARCH_AGENT_ID = "deep_research"
 
 SUB_AGENTS: dict[str, SubAgentSpec] = {
     RESEARCH_AGENT_ID: SubAgentSpec(
@@ -46,6 +47,27 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
         tool_names=(),
         max_inner_rounds=4,
         blurb="Только текст, без web_search.",
+    ),
+    DEEP_RESEARCH_AGENT_ID: SubAgentSpec(
+        id=DEEP_RESEARCH_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент «глубокое исследование». Тебе дают сложный вопрос; твоя задача — "
+            "итеративно собрать факты и выдать структурированный отчёт.\n\n"
+            "Алгоритм:\n"
+            "1. Разложи вопрос на 3–5 под-вопросов (про себя, без вывода пользователю).\n"
+            "2. Для каждого под-вопроса вызови `web_search` с ТЕКСТОВЫМ запросом (не URL).\n"
+            "3. По 1–3 самым релевантным ссылкам из выдачи вызови `fetch_url`, чтобы получить тело страницы.\n"
+            "4. Если по содержимому возник новый под-вопрос — повтори search/fetch.\n"
+            "5. В конце выдай отчёт в формате markdown:\n"
+            "   ## TL;DR — 3–5 строк.\n"
+            "   ## Ключевые выводы — буллет-лист с фактами.\n"
+            "   ## Источники — нумерованный список URL, которые ты реально открывал через fetch_url.\n\n"
+            "Принципы: опирайся ТОЛЬКО на факты из выдачи поиска и скачанных страниц; не придумывай; "
+            "если данных не хватило — честно скажи об этом. Не ходи по одной и той же ссылке дважды."
+        ),
+        tool_names=("web_search", "fetch_url"),
+        max_inner_rounds=16,
+        blurb="Многошаговое исследование с fetch_url и markdown-отчётом.",
     ),
 }
 

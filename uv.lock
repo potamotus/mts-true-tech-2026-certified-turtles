@@ -698,6 +698,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ddgs" },
     { name = "fastapi" },
+    { name = "python-pptx" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -719,6 +720,7 @@ requires-dist = [
     { name = "ddgs", specifier = ">=9.11.3" },
     { name = "fastapi", specifier = ">=0.115.6" },
     { name = "open-webui", marker = "extra == 'openwebui'", specifier = ">=0.6" },
+    { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.1" },
 ]
 provides-extras = ["openwebui"]

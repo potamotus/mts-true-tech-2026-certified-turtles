@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from certified_turtles.api.agent import router as agent_router
+from certified_turtles.api.files import router as files_router
 from certified_turtles.api.openai_proxy import router as openai_proxy_router
 
 app = FastAPI(
@@ -10,11 +11,13 @@ app = FastAPI(
     version="0.3.0",
     description=(
         "Единый фасад над MWS GPT: OpenAI-совместимый прокси для Open WebUI "
-        "(`/v1/*`) и агент с tool calling (`/api/v1/agent/chat`)."
+        "(`/v1/*`), агент с tool calling (`/api/v1/agent/chat`) и раздача "
+        "сгенерированных файлов (`/files/*`)."
     ),
 )
 
 app.include_router(openai_proxy_router)
+app.include_router(files_router)
 app.include_router(agent_router, prefix="/api/v1")
 
 
