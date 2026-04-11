@@ -215,7 +215,7 @@ def _request_ids(body: dict[str, Any]) -> tuple[str, str]:
         or body.get("project_id")
         or metadata.get("project_id")
         or metadata.get("workspace_id")
-        or session_id
+        or "default-scope"
     )
     return str(session_id), str(scope_id)
 
@@ -307,7 +307,7 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         )
     session_id, scope_id = _request_ids(body)
     prepared_messages = runtime.prepare_messages(
-        None if plain else svc.client,
+        svc.client,
         model=model,
         messages=messages,
         session_id=session_id,

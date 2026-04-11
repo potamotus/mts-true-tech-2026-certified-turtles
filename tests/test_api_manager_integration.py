@@ -603,7 +603,7 @@ class TestScopeSessionExtraction:
         body = {}
         sid, scid = _request_ids(body)
         assert sid == "default-session"
-        assert scid == "default-session"
+        assert scid == "default-scope"
 
     def test_non_dict_metadata_ignored(self, monkeypatch):
         from certified_turtles.api.openai_proxy import _request_ids
