@@ -5,6 +5,7 @@ from typing import Any
 
 from certified_turtles.agent_debug_log import agent_logger, summarize_messages
 from certified_turtles.agents.loop import run_agent_chat
+from certified_turtles.memory_runtime import RequestContext
 from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
 from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
@@ -54,6 +55,7 @@ class LLMService:
         messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]] | None = None,
+        request_context: RequestContext | None = None,
         **extra: Any,
     ) -> Any:
         """Одиночный запрос chat/completions. Если `tools` не заданы — подставляем полный каталог родителя."""
@@ -69,12 +71,14 @@ class LLMService:
         self,
         model: str,
         messages: list[dict[str, Any]],
+        *,
+        request_context: RequestContext | None = None,
         **extra: Any,
     ) -> Any:
         """Один запрос к MWS без тулов и без агентского JSON-цикла (как обычный чат в Open WebUI)."""
         messages = normalize_chat_messages(messages)
         _llm_log.debug("chat_plain after normalize\n%s", summarize_messages(messages))
-        call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice")}
+        call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice", "request_context")}
         return self._client.chat_completions(model, messages, **call_kwargs)
 
     def run_agent(
@@ -84,6 +88,7 @@ class LLMService:
         *,
         max_tool_rounds: int = 10,
         tools: list[dict[str, Any]] | None = None,
+        request_context: RequestContext | None = None,
         **extra: Any,
     ) -> dict[str, Any]:
         """Полный agent-цикл с тулами (примитивы + под-агенты). Возвращает `messages`, `completion`, метаданные."""
@@ -101,5 +106,6 @@ class LLMService:
             messages,
             tools=tools,
             max_tool_rounds=rounds,
+            request_context=request_context,
             **extra,
         )

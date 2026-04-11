@@ -1,0 +1,14 @@
+[     274ms] [WARNING] Manifest: Enctype should be set to either application/x-www-form-urlencoded or multipart/form-data. It currently defaults to application/x-www-form-urlencoded @ http://localhost:3000/manifest.json:0
+[    1415ms] [WARNING] No token found in localStorage, user-join event not emitted @ http://localhost:3000/_app/immutable/nodes/0.BtxtnfEF.js:1
+[   53488ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/v1/users/user/settings:0
+[   53494ms] You do not have permission to access this resource. Please contact your administrator for assistance.
+[   68620ms] [WARNING] Manifest: Enctype should be set to either application/x-www-form-urlencoded or multipart/form-data. It currently defaults to application/x-www-form-urlencoded @ http://localhost:3000/manifest.json:0
+[   68731ms] [WARNING] No token found in localStorage, user-join event not emitted @ http://localhost:3000/_app/immutable/nodes/0.BtxtnfEF.js:1
+[   87566ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[   88590ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  430765ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  440802ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  444423ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  447265ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  452915ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0
+[  454879ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/v1/auths/signin:0

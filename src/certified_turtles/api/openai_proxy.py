@@ -15,6 +15,7 @@ from certified_turtles.agents.json_agent_protocol import (
     patch_completion_assistant_markdown,
 )
 from certified_turtles.agent_debug_log import agent_logger, debug_clip, summarize_messages
+from certified_turtles.memory_runtime import RequestContext, runtime_from_env
 from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
 from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
 
@@ -118,6 +119,26 @@ def _wants_plain_chat(body: dict[str, Any]) -> bool:
     return v is False
 
 
+def _request_ids(body: dict[str, Any]) -> tuple[str, str]:
+    metadata = body.get("metadata") if isinstance(body.get("metadata"), dict) else {}
+    session_id = (
+        body.get("ct_session_id")
+        or body.get("conversation_id")
+        or body.get("chat_id")
+        or metadata.get("chat_id")
+        or metadata.get("conversation_id")
+        or "default-session"
+    )
+    scope_id = (
+        body.get("ct_scope_id")
+        or body.get("project_id")
+        or metadata.get("project_id")
+        or metadata.get("workspace_id")
+        or session_id
+    )
+    return str(session_id), str(scope_id)
+
+
 def _openwebui_meta_task_forces_plain(messages: Any) -> bool:
     """Open WebUI шлёт отдельные POST с одним user и префиксом «### Task:» (заголовок чата, follow-up, web search …).
 
@@ -178,9 +199,19 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     extra = {k: v for k, v in body.items() if k not in _PASS_THROUGH_IGNORE}
 
     svc = _service()
+    runtime = runtime_from_env()
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
     plain = force_plain or _wants_plain_chat(body) or ow_meta_plain or ow_tool_router_plain
+    session_id, scope_id = _request_ids(body)
+    prepared_messages = runtime.prepare_messages(
+        None if plain else svc.client,
+        model=model,
+        messages=messages,
+        session_id=session_id,
+        scope_id=scope_id,
+    )
+    req_ctx = RequestContext(session_id=session_id, scope_id=scope_id)
     if ow_meta_plain and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui auxiliary ### Task -> plain chat (no agent JSON protocol)")
     if ow_tool_router_plain and not force_plain and not _wants_plain_chat(body):
@@ -192,20 +223,29 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         stream,
         max_tool_rounds,
         sorted(extra.keys()),
-        summarize_messages(messages, preview=400) if isinstance(messages, list) else str(type(messages)),
+        summarize_messages(prepared_messages, preview=400) if isinstance(prepared_messages, list) else str(type(prepared_messages)),
     )
     try:
         if plain:
-            completion = await asyncio.to_thread(svc.chat_plain, model, messages, **extra)
+            completion = await asyncio.to_thread(
+                svc.chat_plain,
+                model,
+                prepared_messages,
+                request_context=req_ctx,
+                **extra,
+            )
+            final_messages = [*prepared_messages, (completion.get("choices") or [{}])[0].get("message") or {}]
         else:
             out = await asyncio.to_thread(
                 svc.run_agent,
                 model,
-                messages,
+                prepared_messages,
                 max_tool_rounds=max_tool_rounds,
+                request_context=req_ctx,
                 **extra,
             )
             completion = out.get("completion") or {}
+            final_messages = out.get("messages") or prepared_messages
     except MWSGPTError as e:
         raise HTTPException(
             status_code=http_status_for_mws_error(e),
@@ -217,6 +257,14 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     _proxy_log.debug(
         "chat_completions response (visible for UI) preview=\n%s",
         debug_clip(_final_assistant_content(completion)),
+    )
+    runtime.after_response(
+        svc.client,
+        model=model,
+        prepared_messages=prepared_messages,
+        final_messages=final_messages,
+        session_id=session_id,
+        scope_id=scope_id,
     )
     completion = _completion_with_visible_markdown(completion)
     if not stream:

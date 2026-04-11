@@ -1,0 +1,30 @@
+- generic [ref=e2]:
+  - generic [ref=e10]:
+    - generic [ref=e12]: Войти в GPTHub (Open WebUI)
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: Электронная почта
+        - textbox "Электронная почта" [ref=e16]:
+          - /placeholder: Введите вашу электронную почту
+          - text: matvejthaj95208@gmail.com
+      - generic [ref=e17]:
+        - generic [ref=e18]: Пароль
+        - generic [ref=e19]:
+          - generic [ref=e20]: Введите ваш пароль
+          - textbox "Пароль Введите ваш пароль" [ref=e21]:
+            - /placeholder: Введите ваш пароль
+            - text: 41qijwQ#_nv
+          - button "Показать пароль в пользовательском интерфейсе" [pressed] [ref=e22] [cursor=pointer]:
+            - img [ref=e23]
+    - generic [ref=e26]:
+      - button "Войти" [active] [ref=e27] [cursor=pointer]
+      - generic [ref=e28]:
+        - text: У вас нет аккаунта?
+        - button "Зарегистрироваться" [ref=e29] [cursor=pointer]
+  - region "Notifications alt+T":
+    - list:
+      - status [ref=e34]:
+        - button "Close toast" [ref=e35] [cursor=pointer]:
+          - img [ref=e36]
+        - img [ref=e40]
+        - generic [ref=e43]: The email or password provided is incorrect. Please check for typos and try logging in again.

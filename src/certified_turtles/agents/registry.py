@@ -26,6 +26,10 @@ WRITER_AGENT_ID = "writer"
 DEEP_RESEARCH_AGENT_ID = "deep_research"
 CODER_AGENT_ID = "coder"
 DATA_ANALYST_AGENT_ID = "data_analyst"
+MEMORY_EXTRACTOR_AGENT_ID = "memory_extractor"
+SESSION_MEMORY_AGENT_ID = "session_memory"
+AUTO_DREAM_AGENT_ID = "auto_dream"
+MEMORY_TESTER_AGENT_ID = "memory_tester"
 
 SUB_AGENTS: dict[str, SubAgentSpec] = {
     RESEARCH_AGENT_ID: SubAgentSpec(
@@ -105,6 +109,51 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
         tool_names=("workspace_file_path", "execute_python", "read_workspace_file"),
         max_inner_rounds=14,
         blurb="CSV/XLSX: путь к файлу + Python, результат в stdout/артефактах.",
+    ),
+    MEMORY_EXTRACTOR_AGENT_ID: SubAgentSpec(
+        id=MEMORY_EXTRACTOR_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент извлечения памяти в стиле Claude Code. "
+            "Анализируй только недавний диалог, сохраняй долговечные факты в memory/*.md, "
+            "используя file_read/file_write/file_edit/glob_search/grep_search. "
+            "Обновляй MEMORY.md при появлении новых memory files. "
+            "Не сохраняй кодовые паттерны, временные шаги дебага или секреты."
+        ),
+        tool_names=("file_read", "file_write", "file_edit", "glob_search", "grep_search"),
+        max_inner_rounds=5,
+        blurb="Фоновое извлечение долговечной памяти в topic-файлы.",
+    ),
+    SESSION_MEMORY_AGENT_ID: SubAgentSpec(
+        id=SESSION_MEMORY_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент session memory. Поддерживай один session.md файл, суммируя текущее состояние работы: "
+            "task, files, workflow, errors, learnings, next steps. "
+            "Используй file_read/file_write/file_edit и держи summary компактной."
+        ),
+        tool_names=("file_read", "file_write", "file_edit"),
+        max_inner_rounds=4,
+        blurb="Поддержка session memory и compaction surrogate.",
+    ),
+    AUTO_DREAM_AGENT_ID: SubAgentSpec(
+        id=AUTO_DREAM_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент Auto Dream. Консолидируй накопленную память: объединяй дубликаты, "
+            "улучшай описания, удаляй устаревшее, пересобирай MEMORY.md. "
+            "Используй file_read/file_write/file_edit/glob_search/grep_search."
+        ),
+        tool_names=("file_read", "file_write", "file_edit", "glob_search", "grep_search"),
+        max_inner_rounds=10,
+        blurb="Низкочастотная консолидация памяти и индексирование.",
+    ),
+    MEMORY_TESTER_AGENT_ID: SubAgentSpec(
+        id=MEMORY_TESTER_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент тестирования памяти. Проверяй, что memory prompt, MEMORY.md, topic files и session memory "
+            "согласованы. При необходимости читай файлы через file_read и собирай отчёт о пропусках, конфликтах и drift."
+        ),
+        tool_names=("file_read", "glob_search", "grep_search"),
+        max_inner_rounds=6,
+        blurb="Диагностика recall, extraction и session-memory.",
     ),
 }
 

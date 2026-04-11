@@ -115,7 +115,9 @@ def test_openai_proxy_plain_chat_via_use_agent_false(monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert r.json()["choices"][0]["message"]["content"] == "plain"
-    assert fake.calls[0]["messages"] == [{"role": "user", "content": "hi"}]
+    assert fake.calls[0]["messages"][-1] == {"role": "user", "content": "hi"}
+    assert fake.calls[0]["messages"][0]["role"] == "system"
+    assert "# memory" in fake.calls[0]["messages"][0]["content"]
     assert "tools" not in fake.calls[0]["kwargs"]
 
 
@@ -138,7 +140,8 @@ def test_openwebui_auxiliary_task_forces_plain(monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert r.json()["choices"][0]["message"]["content"] == "Title OK"
-    assert fake.calls[0]["messages"] == [{"role": "user", "content": meta}]
+    assert fake.calls[0]["messages"][-1] == {"role": "user", "content": meta}
+    assert fake.calls[0]["messages"][0]["role"] == "system"
     assert "tools" not in fake.calls[0]["kwargs"]
 
 
@@ -192,7 +195,9 @@ def test_openai_proxy_plain_dedicated_url(monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert r.json()["choices"][0]["message"]["content"] == "plain2"
-    assert fake.calls[0]["messages"] == [{"role": "user", "content": "hi"}]
+    assert fake.calls[0]["messages"][-1] == {"role": "user", "content": "hi"}
+    assert fake.calls[0]["messages"][0]["role"] == "system"
+    assert "# memory" in fake.calls[0]["messages"][0]["content"]
 
 
 def test_openai_proxy_chat_clamps_max_tool_rounds(monkeypatch):

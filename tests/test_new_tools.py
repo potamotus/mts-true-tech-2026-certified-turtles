@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import json
 
-from certified_turtles.agents.registry import CODER_AGENT_ID, DEEP_RESEARCH_AGENT_ID, get_subagent
+from certified_turtles.agents.registry import (
+    AUTO_DREAM_AGENT_ID,
+    CODER_AGENT_ID,
+    DEEP_RESEARCH_AGENT_ID,
+    MEMORY_EXTRACTOR_AGENT_ID,
+    MEMORY_TESTER_AGENT_ID,
+    SESSION_MEMORY_AGENT_ID,
+    get_subagent,
+)
 from certified_turtles.tools.parent_tools import get_parent_tools
 from certified_turtles.tools.registry import list_primitive_tool_names, run_primitive_tool
 
@@ -15,6 +23,11 @@ def test_new_primitives_registered():
     assert "generate_presentation" in names
     assert "read_workspace_file" in names
     assert "execute_python" in names
+    assert "file_read" in names
+    assert "file_write" in names
+    assert "file_edit" in names
+    assert "glob_search" in names
+    assert "grep_search" in names
     assert "mws_list_models" in names
     assert "google_docs_read" in names
     assert "google_docs_append" in names
@@ -29,6 +42,11 @@ def test_parent_tools_expose_all():
         "generate_presentation",
         "read_workspace_file",
         "execute_python",
+        "file_read",
+        "file_write",
+        "file_edit",
+        "glob_search",
+        "grep_search",
         "mws_list_models",
         "google_docs_read",
         "google_docs_append",
@@ -36,6 +54,10 @@ def test_parent_tools_expose_all():
         assert expected in tool_names
     assert f"agent_{DEEP_RESEARCH_AGENT_ID}" in tool_names
     assert f"agent_{CODER_AGENT_ID}" in tool_names
+    assert f"agent_{MEMORY_EXTRACTOR_AGENT_ID}" in tool_names
+    assert f"agent_{SESSION_MEMORY_AGENT_ID}" in tool_names
+    assert f"agent_{AUTO_DREAM_AGENT_ID}" in tool_names
+    assert f"agent_{MEMORY_TESTER_AGENT_ID}" in tool_names
 
 
 def test_deep_research_subagent_has_research_tools():
@@ -50,6 +72,18 @@ def test_coder_subagent_has_python_tools():
     assert spec is not None
     assert "execute_python" in spec.tool_names
     assert "read_workspace_file" in spec.tool_names
+
+
+def test_memory_subagents_have_claude_like_file_tools():
+    for agent_id in (
+        MEMORY_EXTRACTOR_AGENT_ID,
+        SESSION_MEMORY_AGENT_ID,
+        AUTO_DREAM_AGENT_ID,
+        MEMORY_TESTER_AGENT_ID,
+    ):
+        spec = get_subagent(agent_id)
+        assert spec is not None
+        assert any(name.startswith("file_") or name.endswith("_search") for name in spec.tool_names)
 
 
 def test_generate_image_returns_pollinations_url():

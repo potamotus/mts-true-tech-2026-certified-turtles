@@ -18,6 +18,7 @@ from certified_turtles.agents.json_agent_protocol import (
 )
 from certified_turtles.agents.registry import get_subagent
 from certified_turtles.mws_gpt.client import MWSGPTClient
+from certified_turtles.memory_runtime.request_context import RequestContext, use_request_context
 from certified_turtles.agent_debug_log import agent_logger, debug_clip, summarize_messages
 from certified_turtles.tools.parent_tools import get_parent_tools, parse_agent_tool_name
 from certified_turtles.tools.registry import openai_tools_for_names, run_primitive_tool
@@ -261,211 +262,213 @@ def run_agent_chat(
     max_tool_rounds: int = 10,
     delegate_depth: int = 0,
     max_delegate_depth: int = 3,
+    request_context: RequestContext | None = None,
     **chat_kwargs: Any,
 ) -> dict[str, Any]:
     """
     Цикл оркестратора: при ненулевом списке тулов — единый JSON-протокол в ответах assistant
     (см. `json_agent_protocol`) и исполнение `calls`; иначе — одиночный chat без протокола.
     """
-    work = copy.deepcopy(messages)
-    tool_list = get_parent_tools() if tools is None else tools
-    use_json_protocol = bool(tool_list)
-    _agent_log.debug(
-        "run_agent_chat start model=%s depth=%s max_rounds=%s json_proto=%s tools=%s",
-        model,
-        delegate_depth,
-        max_tool_rounds,
-        use_json_protocol,
-        len(tool_list or []),
-    )
-    _agent_log.debug("messages before inject:\n%s", summarize_messages(work))
-    if use_json_protocol:
-        _inject_json_protocol_system(work, tool_list=tool_list)
-        _agent_log.debug("messages after inject:\n%s", summarize_messages(work))
-    allowed = _tool_names_from_openai_tools(tool_list) if tool_list else set()
-    last_raw: dict[str, Any] | None = None
-    rounds = 0
-    json_repair_attempts = _json_repair_attempts_budget()
-
-    while rounds < max_tool_rounds:
-        rounds += 1
-        call_kwargs = {k: v for k, v in chat_kwargs.items() if k not in ("tools", "tool_choice")}
-        if not use_json_protocol:
-            if tools is not None and tool_choice is not None:
-                call_kwargs["tool_choice"] = tool_choice
-            if tools is not None:
-                call_kwargs["tools"] = tools
+    with use_request_context(request_context or RequestContext(session_id="global", scope_id="global")):
+        work = copy.deepcopy(messages)
+        tool_list = get_parent_tools() if tools is None else tools
+        use_json_protocol = bool(tool_list)
         _agent_log.debug(
-            "--- round %s/%s messages_in_flight=%s call_kwargs_keys=%s",
-            rounds,
+            "run_agent_chat start model=%s depth=%s max_rounds=%s json_proto=%s tools=%s",
+            model,
+            delegate_depth,
             max_tool_rounds,
-            len(work),
-            sorted(call_kwargs.keys()),
+            use_json_protocol,
+            len(tool_list or []),
         )
-        _agent_log.debug("round %s request history:\n%s", rounds, summarize_messages(work, preview=300))
-        last_raw = client.chat_completions(model, work, **call_kwargs)
-        choice = _first_choice(last_raw)
-        msg = _choice_message(choice)
-        raw_text = message_text_content(msg)
-        _agent_log.debug(
-            "round %s raw assistant len=%s body:\n%s",
-            rounds,
-            len(raw_text),
-            debug_clip(raw_text),
-        )
+        _agent_log.debug("messages before inject:\n%s", summarize_messages(work))
+        if use_json_protocol:
+            _inject_json_protocol_system(work, tool_list=tool_list)
+            _agent_log.debug("messages after inject:\n%s", summarize_messages(work))
+        allowed = _tool_names_from_openai_tools(tool_list) if tool_list else set()
+        last_raw: dict[str, Any] | None = None
+        rounds = 0
+        json_repair_attempts = _json_repair_attempts_budget()
 
-        if not use_json_protocol:
-            work.append(copy.deepcopy(msg))
+        while rounds < max_tool_rounds:
+            rounds += 1
+            call_kwargs = {k: v for k, v in chat_kwargs.items() if k not in ("tools", "tool_choice", "request_context")}
+            if not use_json_protocol:
+                if tools is not None and tool_choice is not None:
+                    call_kwargs["tool_choice"] = tool_choice
+                if tools is not None:
+                    call_kwargs["tools"] = tools
             _agent_log.debug(
-                "plain chat exit round=%s assistant_preview=\n%s",
+                "--- round %s/%s messages_in_flight=%s call_kwargs_keys=%s",
                 rounds,
+                max_tool_rounds,
+                len(work),
+                sorted(call_kwargs.keys()),
+            )
+            _agent_log.debug("round %s request history:\n%s", rounds, summarize_messages(work, preview=300))
+            last_raw = client.chat_completions(model, work, **call_kwargs)
+            choice = _first_choice(last_raw)
+            msg = _choice_message(choice)
+            raw_text = message_text_content(msg)
+            _agent_log.debug(
+                "round %s raw assistant len=%s body:\n%s",
+                rounds,
+                len(raw_text),
                 debug_clip(raw_text),
             )
-            return {
-                "messages": work,
-                "completion": last_raw,
-                "tool_rounds_used": rounds,
-                "truncated": False,
-            }
 
-        parsed = parse_agent_response(raw_text)
-        if parsed is None:
-            _agent_log.debug("round %s parse_agent_response -> None (не JSON протокол)", rounds)
-            if use_json_protocol and json_repair_attempts > 0:
-                json_repair_attempts -= 1
-                logger.warning(
-                    "agent JSON protocol: parse failed at round %s, repair prompt "
-                    "(дальнейших ремонтов JSON осталось: %s). assistant_raw_preview:\n%s",
+            if not use_json_protocol:
+                work.append(copy.deepcopy(msg))
+                _agent_log.debug(
+                    "plain chat exit round=%s assistant_preview=\n%s",
                     rounds,
-                    json_repair_attempts,
+                    debug_clip(raw_text),
+                )
+                return {
+                    "messages": work,
+                    "completion": last_raw,
+                    "tool_rounds_used": rounds,
+                    "truncated": False,
+                }
+
+            parsed = parse_agent_response(raw_text)
+            if parsed is None:
+                _agent_log.debug("round %s parse_agent_response -> None (не JSON протокол)", rounds)
+                if use_json_protocol and json_repair_attempts > 0:
+                    json_repair_attempts -= 1
+                    logger.warning(
+                        "agent JSON protocol: parse failed at round %s, repair prompt "
+                        "(дальнейших ремонтов JSON осталось: %s). assistant_raw_preview:\n%s",
+                        rounds,
+                        json_repair_attempts,
+                        parse_failure_log_preview(raw_text),
+                    )
+                    _agent_log.debug("repair prompt appended, осталось попыток ремонта: %s", json_repair_attempts)
+                    work.append({"role": "assistant", "content": raw_text})
+                    work.append({"role": "user", "content": PROTOCOL_JSON_REPAIR_USER})
+                    continue
+                logger.warning(
+                    "agent JSON protocol: parse failed at round %s — выходим из протокола, "
+                    "пользователю уйдёт сырой/видимый текст без тулов. assistant_raw_preview:\n%s",
+                    rounds,
                     parse_failure_log_preview(raw_text),
                 )
-                _agent_log.debug("repair prompt appended, осталось попыток ремонта: %s", json_repair_attempts)
                 work.append({"role": "assistant", "content": raw_text})
-                work.append({"role": "user", "content": PROTOCOL_JSON_REPAIR_USER})
-                continue
-            logger.warning(
-                "agent JSON protocol: parse failed at round %s — выходим из протокола, "
-                "пользователю уйдёт сырой/видимый текст без тулов. assistant_raw_preview:\n%s",
-                rounds,
-                parse_failure_log_preview(raw_text),
-            )
-            work.append({"role": "assistant", "content": raw_text})
-            visible = extract_user_visible_assistant_text(raw_text)
-            patched = patch_completion_assistant_markdown(last_raw, visible)
-            _agent_log.debug(
-                "parse failed final visible_preview=\n%s",
-                debug_clip(visible),
-            )
-            return {
-                "messages": work,
-                "completion": patched,
-                "tool_rounds_used": rounds,
-                "truncated": False,
-            }
-
-        work.append({"role": "assistant", "content": raw_text})
-        calls = parsed["calls"]
-        _agent_log.debug(
-            "round %s parsed ok calls=%s assistant_markdown_len=%s",
-            rounds,
-            json.dumps([c.get("name") for c in calls], ensure_ascii=False),
-            len(parsed.get("assistant_markdown") or ""),
-        )
-        if calls:
-            _agent_log.debug(
-                "round %s call details: %s",
-                rounds,
-                debug_clip(json.dumps(calls, ensure_ascii=False, indent=2)),
-            )
-        if not calls:
-            md = parsed["assistant_markdown"]
-            _agent_log.debug("round %s финал без тулов, markdown:\n%s", rounds, debug_clip(md))
-            patched = patch_completion_assistant_markdown(last_raw, md)
-            _agent_log.debug(
-                "run_agent_chat final assistant_markdown rounds=%s out=\n%s",
-                rounds,
-                debug_clip(md),
-            )
-            return {
-                "messages": work,
-                "completion": patched,
-                "tool_rounds_used": rounds,
-                "truncated": False,
-            }
-
-        outputs: list[str] = []
-        bound_file_id: str | None = None
-        for c in calls:
-            name = c["name"]
-            args = copy.deepcopy(c["arguments"])
-            if (
-                name == "execute_python"
-                and isinstance(args, dict)
-                and bound_file_id
-                and not str(args.get("file_id") or "").strip()
-            ):
-                args["file_id"] = bound_file_id
+                visible = extract_user_visible_assistant_text(raw_text)
+                patched = patch_completion_assistant_markdown(last_raw, visible)
                 _agent_log.debug(
-                    "round %s auto-bind execute_python.file_id=%s from prior workspace_file_path",
-                    rounds,
-                    bound_file_id,
+                    "parse failed final visible_preview=\n%s",
+                    debug_clip(visible),
                 )
-            _agent_log.debug(
-                "round %s invoke tool name=%s args=%s",
-                rounds,
-                name,
-                debug_clip(json.dumps(args, ensure_ascii=False) if isinstance(args, dict) else str(args)),
-            )
-            if name not in allowed:
-                outputs.append(
-                    json.dumps({"error": "unknown_tool", "name": name}, ensure_ascii=False),
-                )
-                continue
-            out = _execute_tool_call(
-                name,
-                args,
-                client=client,
-                model=model,
-                delegate_depth=delegate_depth,
-                max_delegate_depth=max_delegate_depth,
-                parent_work=work,
-                **chat_kwargs,
-            )
-            _agent_log.debug(
-                "round %s tool result name=%s out_len=%s out_preview=\n%s",
-                rounds,
-                name,
-                len(out),
-                debug_clip(out),
-            )
-            if name == "workspace_file_path":
-                data = _tool_output_json_dict(out)
-                maybe_fid = data.get("file_id") if isinstance(data, dict) else None
-                if isinstance(maybe_fid, str) and maybe_fid.strip():
-                    bound_file_id = maybe_fid.strip()
-            outputs.append(out)
-        tool_msg = tool_outputs_user_message(calls, outputs)
-        _agent_log.debug("round %s tool_outputs user msg len=%s", rounds, len(tool_msg))
-        work.append({"role": "user", "content": tool_msg})
+                return {
+                    "messages": work,
+                    "completion": patched,
+                    "tool_rounds_used": rounds,
+                    "truncated": False,
+                }
 
-    visible = ""
-    if last_raw is not None:
-        try:
-            lm = _choice_message(_first_choice(last_raw))
-            visible = extract_user_visible_assistant_text(message_text_content(lm))
-        except ValueError:
-            visible = ""
-    tail = "\n\n[лимит раундов агента: ответ может быть неполным.]" if not visible.strip() else ""
-    patched = patch_completion_assistant_markdown(last_raw or {}, (visible or "") + tail)
-    _agent_log.debug(
-        "run_agent_chat TRUNCATED rounds_used=%s visible_preview=\n%s",
-        rounds,
-        debug_clip((visible or "") + tail),
-    )
-    return {
-        "messages": work,
-        "completion": patched,
-        "tool_rounds_used": rounds,
-        "truncated": True,
-    }
+            work.append({"role": "assistant", "content": raw_text})
+            calls = parsed["calls"]
+            _agent_log.debug(
+                "round %s parsed ok calls=%s assistant_markdown_len=%s",
+                rounds,
+                json.dumps([c.get("name") for c in calls], ensure_ascii=False),
+                len(parsed.get("assistant_markdown") or ""),
+            )
+            if calls:
+                _agent_log.debug(
+                    "round %s call details: %s",
+                    rounds,
+                    debug_clip(json.dumps(calls, ensure_ascii=False, indent=2)),
+                )
+            if not calls:
+                md = parsed["assistant_markdown"]
+                _agent_log.debug("round %s финал без тулов, markdown:\n%s", rounds, debug_clip(md))
+                patched = patch_completion_assistant_markdown(last_raw, md)
+                _agent_log.debug(
+                    "run_agent_chat final assistant_markdown rounds=%s out=\n%s",
+                    rounds,
+                    debug_clip(md),
+                )
+                return {
+                    "messages": work,
+                    "completion": patched,
+                    "tool_rounds_used": rounds,
+                    "truncated": False,
+                }
+
+            outputs: list[str] = []
+            bound_file_id: str | None = None
+            for c in calls:
+                name = c["name"]
+                args = copy.deepcopy(c["arguments"])
+                if (
+                    name == "execute_python"
+                    and isinstance(args, dict)
+                    and bound_file_id
+                    and not str(args.get("file_id") or "").strip()
+                ):
+                    args["file_id"] = bound_file_id
+                    _agent_log.debug(
+                        "round %s auto-bind execute_python.file_id=%s from prior workspace_file_path",
+                        rounds,
+                        bound_file_id,
+                    )
+                _agent_log.debug(
+                    "round %s invoke tool name=%s args=%s",
+                    rounds,
+                    name,
+                    debug_clip(json.dumps(args, ensure_ascii=False) if isinstance(args, dict) else str(args)),
+                )
+                if name not in allowed:
+                    outputs.append(
+                        json.dumps({"error": "unknown_tool", "name": name}, ensure_ascii=False),
+                    )
+                    continue
+                out = _execute_tool_call(
+                    name,
+                    args,
+                    client=client,
+                    model=model,
+                    delegate_depth=delegate_depth,
+                    max_delegate_depth=max_delegate_depth,
+                    parent_work=work,
+                    **chat_kwargs,
+                )
+                _agent_log.debug(
+                    "round %s tool result name=%s out_len=%s out_preview=\n%s",
+                    rounds,
+                    name,
+                    len(out),
+                    debug_clip(out),
+                )
+                if name == "workspace_file_path":
+                    data = _tool_output_json_dict(out)
+                    maybe_fid = data.get("file_id") if isinstance(data, dict) else None
+                    if isinstance(maybe_fid, str) and maybe_fid.strip():
+                        bound_file_id = maybe_fid.strip()
+                outputs.append(out)
+            tool_msg = tool_outputs_user_message(calls, outputs)
+            _agent_log.debug("round %s tool_outputs user msg len=%s", rounds, len(tool_msg))
+            work.append({"role": "user", "content": tool_msg})
+
+        visible = ""
+        if last_raw is not None:
+            try:
+                lm = _choice_message(_first_choice(last_raw))
+                visible = extract_user_visible_assistant_text(message_text_content(lm))
+            except ValueError:
+                visible = ""
+        tail = "\n\n[лимит раундов агента: ответ может быть неполным.]" if not visible.strip() else ""
+        patched = patch_completion_assistant_markdown(last_raw or {}, (visible or "") + tail)
+        _agent_log.debug(
+            "run_agent_chat TRUNCATED rounds_used=%s visible_preview=\n%s",
+            rounds,
+            debug_clip((visible or "") + tail),
+        )
+        return {
+            "messages": work,
+            "completion": patched,
+            "tool_rounds_used": rounds,
+            "truncated": True,
+        }
