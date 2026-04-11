@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from certified_turtles.services.llm import LLMService
+from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
 
 
 class FakeClient:
@@ -36,7 +36,16 @@ def test_chat_respects_explicit_empty_tools():
     assert "tools" not in kwargs
 
 
-def test_run_agent_passes_tools_to_model(monkeypatch):
+def test_clamp_agent_tool_rounds():
+    assert clamp_agent_tool_rounds(1) == 1
+    assert clamp_agent_tool_rounds(40) == 40
+    assert clamp_agent_tool_rounds(999) == 40
+    assert clamp_agent_tool_rounds(0) == 1
+    assert clamp_agent_tool_rounds("nope") == 10
+    assert clamp_agent_tool_rounds(15.7) == 15
+
+
+def test_run_agent_json_protocol_no_openai_tools_kwarg(monkeypatch):
     monkeypatch.setattr(
         "certified_turtles.agents.loop.run_primitive_tool",
         lambda name, args: "MOCK",
@@ -45,8 +54,25 @@ def test_run_agent_passes_tools_to_model(monkeypatch):
     fake = FakeClient(final)
     svc = LLMService(fake)  # type: ignore[arg-type]
     out = svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_tool_rounds=1)
-    assert out["completion"] is final
+    assert out["completion"]["choices"][0]["message"]["content"] == "done"
     kwargs = fake.calls[0]["kwargs"]
-    assert "tools" in kwargs
-    names = [t["function"]["name"] for t in kwargs["tools"]]
-    assert "web_search" in names
+    assert "tools" not in kwargs
+
+
+def test_run_agent_clamps_rounds_before_loop(monkeypatch):
+    seen: dict[str, int] = {}
+
+    def fake_run_agent_chat(client, model, messages, *, max_tool_rounds: int = 10, **kwargs):
+        seen["max_tool_rounds"] = max_tool_rounds
+        return {
+            "messages": messages,
+            "completion": {"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
+            "tool_rounds_used": 1,
+            "truncated": False,
+        }
+
+    monkeypatch.setattr("certified_turtles.services.llm.run_agent_chat", fake_run_agent_chat)
+    fake = FakeClient({"choices": [{"message": {"role": "assistant", "content": "x"}}]})
+    svc = LLMService(fake)  # type: ignore[arg-type]
+    svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_tool_rounds=500)
+    assert seen["max_tool_rounds"] == 40

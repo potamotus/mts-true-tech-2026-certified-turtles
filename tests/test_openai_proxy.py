@@ -43,11 +43,13 @@ def test_openai_proxy_chat_completions_non_stream(monkeypatch):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["choices"][0]["message"]["content"] == "hello"
-    # Главное: в исходящий запрос к модели подставились тулы.
+    # Агент-цикл: тулы описаны в системном JSON-протоколе, в kwargs MWS не передаём OpenAI tools.
     kwargs = fake.calls[0]["kwargs"]
-    assert "tools" in kwargs and kwargs["tools"]
-    names = [t["function"]["name"] for t in kwargs["tools"]]
-    assert "web_search" in names
+    assert "tools" not in kwargs
+    sys0 = fake.calls[0]["messages"][0]["content"]
+    assert isinstance(sys0, str)
+    assert "assistant_markdown" in sys0
+    assert "web_search" in sys0
 
 
 def test_openai_proxy_chat_completions_stream(monkeypatch):
@@ -81,3 +83,35 @@ def test_openai_proxy_list_models(monkeypatch):
     r = client.get("/v1/models")
     assert r.status_code == 200
     assert r.json()["data"][0]["id"] == "mws-gpt-alpha"
+
+
+def test_openai_proxy_chat_clamps_max_tool_rounds(monkeypatch):
+    final = {
+        "choices": [{"message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
+    }
+    captured: dict[str, int] = {}
+
+    def cap_run_agent_chat(client, model, messages, *, max_tool_rounds: int = 10, **kwargs):
+        captured["max_tool_rounds"] = max_tool_rounds
+        return {
+            "messages": messages,
+            "completion": final,
+            "tool_rounds_used": 1,
+            "truncated": False,
+        }
+
+    monkeypatch.setattr("certified_turtles.services.llm.run_agent_chat", cap_run_agent_chat)
+    fake = FakeClient({})
+    _patch_service(monkeypatch, fake)
+
+    client = TestClient(app)
+    r = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "mws-gpt-alpha",
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tool_rounds": 9999,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert captured["max_tool_rounds"] == 40
