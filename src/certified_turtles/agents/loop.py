@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from certified_turtles.agents.registry import get_subagent
+from certified_turtles.agents.tool_call_recovery import recover_tool_calls_from_assistant_message
 from certified_turtles.mws_gpt.client import MWSGPTClient
 from certified_turtles.tools.parent_tools import get_parent_tools, parse_agent_tool_name
 from certified_turtles.tools.registry import openai_tools_for_names, run_primitive_tool
@@ -15,7 +16,8 @@ logger = logging.getLogger(__name__)
 _TOOL_POLICY = (
     "[Инструменты] Если нужны факты из сети, содержимое страницы по URL, список моделей MWS или выполнение кода на сервере — "
     "используй **вызов функции** в ответе API (`tool_calls`). Markdown-блок ```python ... ``` сам по себе **не исполняется** на сервере; "
-    "для реального вывода нужен соответствующий тул."
+    "для реального вывода нужен соответствующий тул. "
+    "**Не вставляй** в текст ответа JSON с полем `tool_calls` — сервер не исполняет такие блоки, только нативное поле ответа модели."
 )
 
 _MWS_MODELS_HINT = (
@@ -217,9 +219,18 @@ def run_agent_chat(
         last_raw = client.chat_completions(model, work, **call_kwargs)
         choice = _first_choice(last_raw)
         msg = _choice_message(choice)
-        work.append(copy.deepcopy(msg))
+        msg_out = copy.deepcopy(msg)
+        tcalls = list(msg_out.get("tool_calls") or [])
+        allowed = _tool_names_from_openai_tools(tool_list) if tool_list else set()
+        if not tcalls and allowed:
+            recovered, new_content = recover_tool_calls_from_assistant_message(msg_out, allowed)
+            if recovered:
+                msg_out["tool_calls"] = recovered
+                tcalls = recovered
+                if new_content is not None:
+                    msg_out["content"] = new_content or None
+        work.append(msg_out)
 
-        tcalls = msg.get("tool_calls") or []
         if not tcalls:
             return {
                 "messages": work,
