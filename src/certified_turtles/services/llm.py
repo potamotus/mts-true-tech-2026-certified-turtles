@@ -5,6 +5,7 @@ from typing import Any
 
 from certified_turtles.agents.loop import run_agent_chat
 from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
+from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
 
 
@@ -40,6 +41,7 @@ class LLMService:
         **extra: Any,
     ) -> Any:
         """Одиночный запрос chat/completions. Если `tools` не заданы — подставляем полный каталог родителя."""
+        messages = normalize_chat_messages(messages)
         effective_tools = tools if tools is not None else get_parent_tools()
         call_kwargs = dict(extra)
         if effective_tools:
@@ -56,6 +58,7 @@ class LLMService:
         **extra: Any,
     ) -> dict[str, Any]:
         """Полный agent-цикл с тулами (примитивы + под-агенты). Возвращает `messages`, `completion`, метаданные."""
+        messages = normalize_chat_messages(messages)
         return run_agent_chat(
             self._client,
             model,

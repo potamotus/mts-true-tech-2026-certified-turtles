@@ -12,7 +12,10 @@ services:
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
       GENERATED_FILES_DIR: /data/generated
+      UPLOADS_DIR: /data/generated/uploads
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      # Опционально: путь к JSON service account для тулов google_docs_* (файл смонтируйте вручную при необходимости).
+      # GOOGLE_DOCS_CREDENTIALS_JSON: /secrets/google-docs-sa.json
     volumes:
       - generated-files:/data/generated
     restart: unless-stopped

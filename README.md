@@ -101,7 +101,9 @@ Architecture:
    - `GET /health`
    - `GET /v1/models`, `POST /v1/chat/completions` — OpenAI-совместимый прокси для Open WebUI (`stream` поддерживается псевдо-чанком).
    - `POST /api/v1/agent/chat` — наш собственный шейп агент-цикла (оставлен для CLI/скриптов).
-   - `GET /files/{filename}` — раздача файлов, сгенерированных тулами (например `.pptx` от `generate_presentation`). В docker-compose монтируется том `generated-files:/data/generated`.
+   - `POST /api/v1/uploads` — загрузка файла в рабочую область агента (multipart); дальше тул `read_workspace_file` по полю `file_id`.
+   - `GET /files/{filename}` — раздача файлов из `GENERATED_FILES_DIR` (например `.pptx`).
+   - `GET /files/python_runs/{run_id}/{filename}` — артефакты после `execute_python` (графики и т.д.). В docker-compose монтируется том `generated-files:/data/generated` (внутри также `uploads/`).
    CLI: `uv run mws-gpt agent --model <id> -p "…"`.
 
 ### Доступные тулы и под-агенты
@@ -112,6 +114,9 @@ Architecture:
 - **`fetch_url`** — скачивание страницы и преобразование HTML→text (stdlib, без браузера).
 - **`generate_image`** — генерация картинки через Pollinations.ai (free-tier, без ключа). Возвращает URL и готовую markdown-вставку `![](…)`, которую Open WebUI рендерит инлайн.
 - **`generate_presentation`** — сборка настоящего `.pptx` через `python-pptx`. Файл пишется в `GENERATED_FILES_DIR`, раздаётся через `/files/{name}.pptx`, URL строится из `PUBLIC_API_BASE_URL`.
+- **`read_workspace_file`** — чтение текста из файла, предварительно загруженного через `POST /api/v1/uploads` (поле `file_id`).
+- **`execute_python`** — запуск ограниченного Python (отдельный процесс, таймаут) для анализа данных и графиков (`numpy` / `matplotlib` / `pandas`); графики сохранять в `CT_RUN_OUTPUT_DIR`, ссылки — `GET /files/python_runs/{run_id}/…`.
+- **`google_docs_read` / `google_docs_append`** — чтение текста и дописывание в конец Google Doc через API; нужен JSON service account и расшаривание документа на его email (`GOOGLE_DOCS_CREDENTIALS_JSON`, см. `.env.example`). Зависимости: optional `google` в `pyproject.toml` (в Docker-образе включено).
 
 Под-агенты (`agents/registry.py`, вызываются родительским LLM как `agent_{id}`):
 

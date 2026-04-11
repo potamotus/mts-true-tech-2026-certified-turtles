@@ -13,11 +13,24 @@ def test_new_primitives_registered():
     assert "fetch_url" in names
     assert "generate_image" in names
     assert "generate_presentation" in names
+    assert "read_workspace_file" in names
+    assert "execute_python" in names
+    assert "google_docs_read" in names
+    assert "google_docs_append" in names
 
 
 def test_parent_tools_expose_all():
     tool_names = [t["function"]["name"] for t in get_parent_tools()]
-    for expected in ("web_search", "fetch_url", "generate_image", "generate_presentation"):
+    for expected in (
+        "web_search",
+        "fetch_url",
+        "generate_image",
+        "generate_presentation",
+        "read_workspace_file",
+        "execute_python",
+        "google_docs_read",
+        "google_docs_append",
+    ):
         assert expected in tool_names
     assert f"agent_{DEEP_RESEARCH_AGENT_ID}" in tool_names
 
