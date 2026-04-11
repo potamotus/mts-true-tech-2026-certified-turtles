@@ -99,7 +99,11 @@ def _read_with_includes(path: Path, *, seen: set[Path], depth: int = 0) -> str:
     resolved = path.resolve(strict=False)
     if resolved in seen:
         return ""
-    if not path.is_file():
+    try:
+        is_file = path.is_file()
+    except OSError:
+        is_file = False
+    if not is_file:
         if depth > 0:
             _log.debug("@include target not found: %s", path)
         return ""

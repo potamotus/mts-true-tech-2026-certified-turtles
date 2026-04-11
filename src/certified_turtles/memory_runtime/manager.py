@@ -287,8 +287,15 @@ class ClaudeLikeMemoryRuntime:
                             {"timestamp": time.time(), "role": "user", "kind": "tool_result", "tool_name": item.get("name"), "output": item.get("output")},
                         )
 
+    _MAX_SESSION_UPDATES = 500
+
     def _note_session_turn(self, session_id: str) -> None:
         self._session_updates[session_id] = time.time()
+        if len(self._session_updates) > self._MAX_SESSION_UPDATES:
+            # Evict oldest half to amortize cleanup cost.
+            sorted_keys = sorted(self._session_updates, key=self._session_updates.get)  # type: ignore[arg-type]
+            for k in sorted_keys[: len(sorted_keys) // 2]:
+                del self._session_updates[k]
 
     # ── session memory decision ──────────────────────────────
 

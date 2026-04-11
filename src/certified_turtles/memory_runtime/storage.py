@@ -197,6 +197,8 @@ def _validate_memory_filename(raw: str | None, *, fallback_name: str) -> Path:
         sanitized = SAFE_SEGMENT_RE.sub("-", part).strip("-")
         if not sanitized:
             raise ValueError("memory filename contains an empty path segment after sanitization")
+        if len(sanitized.encode("utf-8")) > 255:
+            raise ValueError("memory filename segment exceeds 255 bytes")
         parts.append(sanitized)
     if not parts:
         parts = [f"{slugify(fallback_name)}.md"]
@@ -261,9 +263,17 @@ def memory_index_path(scope_id: str) -> Path:
 
 def list_memory_files(scope_id: str) -> list[Path]:
     root = memory_dir(scope_id)
-    files = [p for p in root.rglob("*.md") if p.name != "MEMORY.md"]
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return files[:MAX_MEMORY_FILES]
+    files: list[tuple[float, Path]] = []
+    for p in root.rglob("*.md"):
+        if p.name == "MEMORY.md":
+            continue
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            continue
+        files.append((mtime, p))
+    files.sort(key=lambda t: t[0], reverse=True)
+    return [p for _, p in files[:MAX_MEMORY_FILES]]
 
 
 def scan_memory_headers(scope_id: str) -> list[MemoryHeader]:
