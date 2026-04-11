@@ -342,13 +342,19 @@ class ClaudeLikeMemoryRuntime:
 
         async def runner():
             try:
-                await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self.forks.run_named_subagent,
                     client,
                     session_id=session_id,
                     agent_id="memory_extractor",
                     prompt=prompt,
                 )
+                if result is None:
+                    _log.warning("extract hook returned None (no snapshot or spec?) session=%s", session_id)
+                elif result.get("truncated"):
+                    _log.warning("extract hook truncated (round limit) session=%s", session_id)
+            except Exception:
+                _log.exception("extract hook FAILED session=%s scope=%s", session_id, scope_id)
             finally:
                 self._extract_in_progress.discard(session_id)
                 trailing = self._extract_trailing.pop(session_id, None)
