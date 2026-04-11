@@ -85,6 +85,55 @@ def test_openai_proxy_list_models(monkeypatch):
     assert r.json()["data"][0]["id"] == "mws-gpt-alpha"
 
 
+def test_openai_proxy_plain_models_alias(monkeypatch):
+    fake = FakeClient({})
+    _patch_service(monkeypatch, fake)
+
+    client = TestClient(app)
+    r = client.get("/v1/plain/models")
+    assert r.status_code == 200
+    assert r.json()["data"][0]["id"] == "mws-gpt-alpha"
+
+
+def test_openai_proxy_plain_chat_via_use_agent_false(monkeypatch):
+    final = {
+        "choices": [{"message": {"role": "assistant", "content": "plain"}, "finish_reason": "stop"}],
+    }
+    fake = FakeClient(final)
+    _patch_service(monkeypatch, fake)
+
+    client = TestClient(app)
+    r = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "mws-gpt-alpha",
+            "messages": [{"role": "user", "content": "hi"}],
+            "use_agent": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["choices"][0]["message"]["content"] == "plain"
+    assert fake.calls[0]["messages"] == [{"role": "user", "content": "hi"}]
+    assert "tools" not in fake.calls[0]["kwargs"]
+
+
+def test_openai_proxy_plain_dedicated_url(monkeypatch):
+    final = {
+        "choices": [{"message": {"role": "assistant", "content": "plain2"}, "finish_reason": "stop"}],
+    }
+    fake = FakeClient(final)
+    _patch_service(monkeypatch, fake)
+
+    client = TestClient(app)
+    r = client.post(
+        "/v1/plain/chat/completions",
+        json={"model": "mws-gpt-alpha", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["choices"][0]["message"]["content"] == "plain2"
+    assert fake.calls[0]["messages"] == [{"role": "user", "content": "hi"}]
+
+
 def test_openai_proxy_chat_clamps_max_tool_rounds(monkeypatch):
     final = {
         "choices": [{"message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],

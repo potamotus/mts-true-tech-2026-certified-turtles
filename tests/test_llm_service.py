@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
 
 
@@ -26,6 +28,19 @@ def test_chat_injects_tools_by_default():
     names = [t["function"]["name"] for t in tools if t.get("type") == "function"]
     assert "web_search" in names, "web_search должен автоинжектиться"
     assert any(n.startswith("agent_") for n in names), "под-агенты должны быть в каталоге"
+
+
+def test_chat_plain_skips_tools():
+    captured: dict[str, Any] = {}
+
+    class Fake:
+        def chat_completions(self, model: str, messages: list, **kwargs):
+            captured["kwargs"] = kwargs
+            return {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+
+    svc = LLMService(Fake())  # type: ignore[arg-type]
+    svc.chat_plain("m", [{"role": "user", "content": "x"}])
+    assert "tools" not in captured["kwargs"]
 
 
 def test_chat_respects_explicit_empty_tools():

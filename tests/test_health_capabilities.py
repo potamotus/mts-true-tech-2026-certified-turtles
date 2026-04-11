@@ -21,6 +21,7 @@ def test_health_includes_google_docs_capability():
     assert "google_docs_ready" in g
     assert "service_account_client_email" in g
     assert "google_python_packages_installed" in g
+    assert g.get("public_read_by_link_supported") is True
 
 
 def test_protocol_system_includes_google_docs_guide():

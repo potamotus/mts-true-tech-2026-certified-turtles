@@ -16,8 +16,8 @@ app = FastAPI(
     version="0.3.0",
     description=(
         "Единый фасад над MWS GPT: OpenAI-совместимый прокси для Open WebUI "
-        "(`/v1/*`), агент с tool calling (`/api/v1/agent/chat`), загрузки "
-        "(`POST /api/v1/uploads`) и раздача файлов (`/files/*`)."
+        "(`/v1/*` — агент с тулами; `/v1/plain/*` — обычный чат), "
+        "`/api/v1/agent/chat`, загрузки `POST /api/v1/uploads`, раздача `/files/*`."
     ),
 )
 

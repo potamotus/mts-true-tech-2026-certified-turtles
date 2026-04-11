@@ -95,11 +95,12 @@ Architecture:
 2. Запуск: `docker compose up --build`
 3. UI: [http://localhost:3000](http://localhost:3000) (порт задаётся `OPEN_WEBUI_PORT`).
 4. **Модели:** список подтягивается через наш FastAPI (`GET /v1/models` → MWS). В шапке чата выберите модель **вручную** (автовыбор — отдельная задача).
-5. **Архитектура:** Open WebUI → FastAPI-прокси (`api` в compose) → MWS GPT. Открытая точка из UI — `OPENAI_API_BASE_URL=http://api:8000/v1`. Благодаря этому **любой** чат из UI проходит через агент-цикл, и в исходящий запрос к модели автоматически инжектятся все зарегистрированные тулы (`register_tool`, см. `src/certified_turtles/tools/builtins/`) и под-агенты (`agents/registry.py` как `agent_{id}`, напр. `agent_research`).
+5. **Архитектура:** Open WebUI → FastAPI-прокси (`api` в compose) → MWS GPT. По умолчанию `OPENAI_API_BASE_URL=http://api:8000/v1` — чат идёт через **агентский** JSON-цикл с тулами. **Обычный чат без тулов:** заведите второе подключение OpenAI в WebUI с тем же ключом и **`OPENAI_API_BASE_URL=http://api:8000/v1/plain`** (эндпоинты `…/v1/plain/models` и `…/v1/plain/chat/completions` зеркалят OpenAI-контракт без агента). Либо в одном подключении в теле запроса передавайте **`"use_agent": false`** (если клиент умеет доп. поля JSON).
 6. Единая точка входа в LLM — `certified_turtles.services.llm.LLMService`: `list_models()`, `chat(...)` (single-shot с автоинъекцией тулов), `run_agent(...)` (полный tool-calling loop). Все API-эндпоинты и CLI идут через неё, отдельные `MWSGPTClient` по сервису не плодим.
 7. Эндпоинты FastAPI (`http://localhost:8000`):
    - `GET /health`
-   - `GET /v1/models`, `POST /v1/chat/completions` — OpenAI-совместимый прокси для Open WebUI (`stream` поддерживается псевдо-чанком).
+   - `GET /v1/models`, `POST /v1/chat/completions` — OpenAI-совместимый прокси для Open WebUI (`stream` поддерживается псевдо-чанком); агент по умолчанию.
+   - `GET /v1/plain/models`, `POST /v1/plain/chat/completions` — то же для UI с base `…/v1/plain` (чат без агента и тулов).
    - `POST /api/v1/agent/chat` — наш собственный шейп агент-цикла (оставлен для CLI/скриптов).
    - `POST /api/v1/uploads` — загрузка файла в рабочую область агента (multipart); дальше тул `read_workspace_file` по полю `file_id`.
    - `GET /files/{filename}` — раздача файлов из `GENERATED_FILES_DIR` (например `.pptx`).
@@ -116,7 +117,7 @@ Architecture:
 - **`generate_presentation`** — сборка настоящего `.pptx` через `python-pptx`. Файл пишется в `GENERATED_FILES_DIR`, раздаётся через `/files/{name}.pptx`, URL строится из `PUBLIC_API_BASE_URL`.
 - **`read_workspace_file`** — чтение текста из файла, предварительно загруженного через `POST /api/v1/uploads` (поле `file_id`).
 - **`execute_python`** — запуск ограниченного Python (отдельный процесс, таймаут) для анализа данных и графиков (`numpy` / `matplotlib` / `pandas`); графики сохранять в `CT_RUN_OUTPUT_DIR`, ссылки — `GET /files/python_runs/{run_id}/…`.
-- **`google_docs_read` / `google_docs_append`** — чтение текста и дописывание в конец Google Doc через API; нужен JSON service account и расшаривание документа на его email (`GOOGLE_DOCS_CREDENTIALS_JSON`, см. `.env.example`). Зависимости: optional `google` в `pyproject.toml` (в Docker-образе включено). Проверка готовности: `GET /health` → `capabilities.google_docs` (в т.ч. `service_account_client_email` для шаринга). В системном промпте агента при наличии этих тулов добавляется блок с шагами для пользователя.
+- **`google_docs_read` / `google_docs_append`** — **чтение:** достаточно открыть документ для **всех по ссылке (читатель)** и дать ссылку — сервер тянет `export?format=txt` без личного ключа пользователя; при настроенном service account сначала используется API (приватные доки, расшаренные на `client_email`). **Запись (`append`):** нужен `GOOGLE_DOCS_CREDENTIALS_JSON` и шаринг на email сервис-аккаунта с ролью **Редактор** (см. `.env.example`). Проверка: `GET /health` → `capabilities.google_docs`.
 
 Под-агенты (`agents/registry.py`, вызываются родительским LLM как `agent_{id}`):
 

@@ -40,6 +40,7 @@ services:
       ENABLE_OLLAMA_API: "False"
       ENABLE_OPENAI_API: "True"
       OPENAI_API_KEY: ${MWS_API_KEY:-}
+      # Агент (тулы): http://api:8000/v1 — второе подключение «просто чат»: http://api:8000/v1/plain (см. README).
       OPENAI_API_BASE_URL: http://api:8000/v1
       # Голос и live-режим (Call): STT/TTS через Web Speech API в браузере — без серверных моделей.
       # MWS не даёт audio-эндпоинтов, поэтому используем встроенный движок браузера.

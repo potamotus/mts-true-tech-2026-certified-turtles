@@ -8,6 +8,19 @@ from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
 from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
 
+# Согласовано с `AgentChatRequest.max_tool_rounds` (API) и телом Open WebUI к `/v1/chat/completions`.
+_MAX_AGENT_TOOL_ROUNDS = 40
+_MIN_AGENT_TOOL_ROUNDS = 1
+
+
+def clamp_agent_tool_rounds(value: Any) -> int:
+    """Ограничивает число раундов tool-calling (защита от зависаний и мусора в JSON)."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        n = 10
+    return max(_MIN_AGENT_TOOL_ROUNDS, min(_MAX_AGENT_TOOL_ROUNDS, n))
+
 
 class LLMService:
     """Единая точка входа в LLM: list_models, обычный chat и agent-цикл с тулами.
@@ -48,6 +61,17 @@ class LLMService:
             call_kwargs.setdefault("tools", effective_tools)
         return self._client.chat_completions(model, messages, **call_kwargs)
 
+    def chat_plain(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        **extra: Any,
+    ) -> Any:
+        """Один запрос к MWS без тулов и без агентского JSON-цикла (как обычный чат в Open WebUI)."""
+        messages = normalize_chat_messages(messages)
+        call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice")}
+        return self._client.chat_completions(model, messages, **call_kwargs)
+
     def run_agent(
         self,
         model: str,
@@ -59,11 +83,12 @@ class LLMService:
     ) -> dict[str, Any]:
         """Полный agent-цикл с тулами (примитивы + под-агенты). Возвращает `messages`, `completion`, метаданные."""
         messages = normalize_chat_messages(messages)
+        rounds = clamp_agent_tool_rounds(max_tool_rounds)
         return run_agent_chat(
             self._client,
             model,
             messages,
             tools=tools,
-            max_tool_rounds=max_tool_rounds,
+            max_tool_rounds=rounds,
             **extra,
         )
