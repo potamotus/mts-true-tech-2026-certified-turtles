@@ -1,0 +1,9 @@
+# lm-evaluation-harness
+lm-eval[api]>=0.4.0
+
+# For aggregate_results.py
+tabulate>=0.9.0
+pandas>=2.0.0
+
+# OpenAI API client (used by lm-eval)
+openai>=1.0.0

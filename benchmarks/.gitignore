@@ -1,0 +1,4 @@
+# Benchmark results (large files)
+results/
+local_results/
+parsed_data/
