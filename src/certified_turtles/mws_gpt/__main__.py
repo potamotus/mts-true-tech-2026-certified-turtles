@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from certified_turtles.agents.loop import run_agent_chat
+from certified_turtles.services.llm import LLMService
 
 from .client import DEFAULT_BASE_URL, MWSGPTClient, MWSGPTError
 
@@ -99,8 +99,8 @@ def cmd_agent(args: argparse.Namespace, client: MWSGPTClient) -> int:
         extra["temperature"] = args.temperature
     if args.max_tokens is not None:
         extra["max_tokens"] = args.max_tokens
-    out = run_agent_chat(
-        client,
+    service = LLMService(client)
+    out = service.run_agent(
         args.model,
         messages,
         max_tool_rounds=args.max_tool_rounds,

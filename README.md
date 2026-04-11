@@ -94,9 +94,14 @@ Architecture:
 1. Скопируйте `.env.example` → `.env`, укажите `MWS_API_KEY` (и при желании `WEBUI_SECRET_KEY`).
 2. Запуск: `docker compose up --build`
 3. UI: [http://localhost:3000](http://localhost:3000) (порт задаётся `OPEN_WEBUI_PORT`).
-4. **Модели:** список подтягивается с MWS через **`/v1/models`**; в шапке чата выберите модель **вручную** (автовыбор и тулзы не подключались). Подробнее: [docs/openwebui-ux.md](docs/openwebui-ux.md).
-5. Бэкенд UI — [Open WebUI](https://github.com/open-webui/open-webui), провайдер — MWS GPT (`OPENAI_API_BASE_URL` в `docker-compose.yml`). В compose заданы `BYPASS_MODEL_ACCESS_CONTROL`, `WEBUI_NAME`, `DEFAULT_LOCALE`.
-6. Опционально FastAPI: [http://localhost:8000/health](http://localhost:8000/health). **Оркестратор LLM:** `POST http://localhost:8000/api/v1/agent/chat` — в `tools` автоматически попадают зарегистрированные **примитивные тулы** (`register_tool` в коде, см. `src/certified_turtles/tools/builtins/`) и **под-агенты** из `agents/registry.py` как отдельные функции `agent_{id}` (например `agent_research`). CLI: `uv run mws-gpt agent --model <id> -p "…"`.
+4. **Модели:** список подтягивается через наш FastAPI (`GET /v1/models` → MWS). В шапке чата выберите модель **вручную** (автовыбор — отдельная задача).
+5. **Архитектура:** Open WebUI → FastAPI-прокси (`api` в compose) → MWS GPT. Открытая точка из UI — `OPENAI_API_BASE_URL=http://api:8000/v1`. Благодаря этому **любой** чат из UI проходит через агент-цикл, и в исходящий запрос к модели автоматически инжектятся все зарегистрированные тулы (`register_tool`, см. `src/certified_turtles/tools/builtins/`) и под-агенты (`agents/registry.py` как `agent_{id}`, напр. `agent_research`).
+6. Единая точка входа в LLM — `certified_turtles.services.llm.LLMService`: `list_models()`, `chat(...)` (single-shot с автоинъекцией тулов), `run_agent(...)` (полный tool-calling loop). Все API-эндпоинты и CLI идут через неё, отдельные `MWSGPTClient` по сервису не плодим.
+7. Эндпоинты FastAPI (`http://localhost:8000`):
+   - `GET /health`
+   - `GET /v1/models`, `POST /v1/chat/completions` — OpenAI-совместимый прокси для Open WebUI (`stream` поддерживается псевдо-чанком).
+   - `POST /api/v1/agent/chat` — наш собственный шейп агент-цикла (оставлен для CLI/скриптов).
+   CLI: `uv run mws-gpt agent --model <id> -p "…"`.
 
 **Без Docker (только uv):** из **корня репозитория** — `uv sync --extra openwebui`. В `.env` должен быть `MWS_API_KEY`. Перед запуском WebUI экспортируйте MWS в переменные, которые ждёт Open WebUI (в одной оболочке):
 

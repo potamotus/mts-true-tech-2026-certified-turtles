@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import os
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from certified_turtles.agents.loop import run_agent_chat
-from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient, MWSGPTError
+from certified_turtles.mws_gpt.client import MWSGPTError
+from certified_turtles.services.llm import LLMService
 
 router = APIRouter(tags=["agent"])
 
@@ -29,9 +27,7 @@ class AgentChatRequest(BaseModel):
 @router.post("/agent/chat")
 def agent_chat(body: AgentChatRequest) -> dict:
     try:
-        client = MWSGPTClient(
-            base_url=os.environ.get("MWS_API_BASE", DEFAULT_BASE_URL),
-        )
+        service = LLMService.from_env()
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -42,8 +38,7 @@ def agent_chat(body: AgentChatRequest) -> dict:
         extra["max_tokens"] = body.max_tokens
 
     try:
-        return run_agent_chat(
-            client,
+        return service.run_agent(
             body.model,
             body.messages,
             max_tool_rounds=body.max_tool_rounds,
