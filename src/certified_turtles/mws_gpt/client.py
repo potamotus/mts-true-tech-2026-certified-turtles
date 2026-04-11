@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import urllib.error
 import urllib.request
 from typing import Any
@@ -17,6 +18,13 @@ class MWSGPTError(Exception):
         super().__init__(message)
         self.status = status
         self.body = body
+
+
+def http_status_for_mws_error(e: MWSGPTError) -> int:
+    """HTTP-код для прокси: ошибки MWS как есть, сетевые/таймауты — 502/504."""
+    if e.status is not None and 400 <= int(e.status) < 600:
+        return int(e.status)
+    return 502
 
 
 class MWSGPTClient:
@@ -56,11 +64,37 @@ class MWSGPTClient:
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            timeout_sec = int(os.environ.get("MWS_HTTP_TIMEOUT_SEC", "120"))
+        except (TypeError, ValueError):
+            timeout_sec = 120
+        timeout_sec = max(30, min(600, timeout_sec))
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
                 raw = resp.read().decode("utf-8")
+        except TimeoutError as e:
+            raise MWSGPTError(
+                f"Таймаут MWS при {method} {path} (лимит {timeout_sec}s чтения ответа). "
+                "Попробуйте другую модель, уменьшите контекст или max_tool_rounds.",
+                status=504,
+                body=str(e),
+            ) from e
+        except socket.timeout as e:
+            raise MWSGPTError(
+                f"Таймаут сокета MWS при {method} {path} ({timeout_sec}s).",
+                status=504,
+                body=str(e),
+            ) from e
         except urllib.error.HTTPError as e:
             raw = e.read().decode("utf-8", errors="replace")
             raise MWSGPTError(e.reason or str(e), status=e.code, body=raw) from e
+        except urllib.error.URLError as e:
+            reason = getattr(e, "reason", e)
+            msg = repr(reason) if reason is not None else str(e)
+            raise MWSGPTError(
+                f"Сеть при обращении к MWS ({method} {path}): {msg}",
+                status=502,
+                body=str(e),
+            ) from e
 
         if not raw:
             return None

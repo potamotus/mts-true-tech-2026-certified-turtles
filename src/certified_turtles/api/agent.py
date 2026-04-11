@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from certified_turtles.mws_gpt.client import MWSGPTError
+from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
 from certified_turtles.services.llm import LLMService
 
 router = APIRouter(tags=["agent"])
@@ -25,7 +27,7 @@ class AgentChatRequest(BaseModel):
 
 
 @router.post("/agent/chat")
-def agent_chat(body: AgentChatRequest) -> dict:
+async def agent_chat(body: AgentChatRequest) -> dict:
     try:
         service = LLMService.from_env()
     except ValueError as e:
@@ -38,7 +40,8 @@ def agent_chat(body: AgentChatRequest) -> dict:
         extra["max_tokens"] = body.max_tokens
 
     try:
-        return service.run_agent(
+        return await asyncio.to_thread(
+            service.run_agent,
             body.model,
             body.messages,
             max_tool_rounds=body.max_tool_rounds,
@@ -46,7 +49,7 @@ def agent_chat(body: AgentChatRequest) -> dict:
         )
     except MWSGPTError as e:
         raise HTTPException(
-            status_code=502,
+            status_code=http_status_for_mws_error(e),
             detail={"message": str(e), "status": e.status, "body": e.body},
         ) from e
     except ValueError as e:

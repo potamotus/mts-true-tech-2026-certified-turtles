@@ -24,6 +24,7 @@ class SubAgentSpec:
 RESEARCH_AGENT_ID = "research"
 WRITER_AGENT_ID = "writer"
 DEEP_RESEARCH_AGENT_ID = "deep_research"
+CODER_AGENT_ID = "coder"
 
 SUB_AGENTS: dict[str, SubAgentSpec] = {
     RESEARCH_AGENT_ID: SubAgentSpec(
@@ -68,6 +69,18 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
         tool_names=("web_search", "fetch_url"),
         max_inner_rounds=16,
         blurb="Многошаговое исследование с fetch_url и markdown-отчётом.",
+    ),
+    CODER_AGENT_ID: SubAgentSpec(
+        id=CODER_AGENT_ID,
+        system_prompt=(
+            "Ты под-агент «код и данные». Решай задачу через серверное выполнение Python: вызывай `execute_python` "
+            "с полным скриптом в аргументе `code` (один вызов — один запуск процесса). "
+            "Для файлов из рабочей области пользователя используй `read_workspace_file` с `file_id` из контекста загрузки. "
+            "По результатам тулов формируй понятный ответ пользователю; ссылки на графики и файлы копируй из JSON ответа."
+        ),
+        tool_names=("execute_python", "read_workspace_file"),
+        max_inner_rounds=12,
+        blurb="Запуск Python, графики, разбор загруженных файлов.",
     ),
 }
 

@@ -175,9 +175,10 @@ register_tool(
     ToolSpec(
         name="execute_python",
         description=(
-            "Выполнить ограниченный Python для анализа данных и построения графиков (matplotlib/numpy/pandas). "
-            "Код запускается в отдельном процессе с таймаутом; запрещены опасные import и вызовы open/eval/exec. "
-            "Для сохранения графиков используй plt.savefig(os.path.join(CT_RUN_OUTPUT_DIR, 'plot.png'))."
+            "Серверное выполнение Python: единственный способ реально запустить код здесь (анализ, расчёты, симуляции, графики). "
+            "Передай полный скрипт в `code`; процесс изолирован, таймаут; разрешены numpy/matplotlib/pandas и др. из белого списка, "
+            "без open/eval/exec и произвольных import. "
+            "Графики: plt.savefig(os.path.join(CT_RUN_OUTPUT_DIR, 'plot.png')); в ответе — stdout/stderr и URL артефактов."
         ),
         parameters={
             "type": "object",
