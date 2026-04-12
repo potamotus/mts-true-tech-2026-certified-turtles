@@ -66,6 +66,23 @@ def _truncate_entrypoint_content(raw: str) -> str:
     )
 
 
+def _memory_age_days(mtime: float) -> int:
+    return max(0, int((time.time() - mtime) / 86400))
+
+
+def _memory_freshness_text(mtime: float) -> str:
+    """Match Claude Code's memoryFreshnessText() from memoryAge.ts."""
+    d = _memory_age_days(mtime)
+    if d <= 1:
+        return ""
+    return (
+        f"This memory is {d} days old. "
+        "Memories are point-in-time observations, not live state — "
+        "claims about code behavior or file:line citations may be outdated. "
+        "Verify against current code before asserting as fact."
+    )
+
+
 def _memory_age_warning(updated: str) -> str:
     if not updated:
         return ""
@@ -73,13 +90,11 @@ def _memory_age_warning(updated: str) -> str:
         stamp = time.strptime(updated, "%Y-%m-%dT%H:%M:%SZ")
     except ValueError:
         return ""
-    age_days = int((time.time() - calendar.timegm(stamp)) / 86400)
-    if age_days <= 1:
+    mtime = calendar.timegm(stamp)
+    text = _memory_freshness_text(mtime)
+    if not text:
         return ""
-    return (
-        f"\nThis memory is {age_days} days old. Memories are point-in-time observations. "
-        "Verify code, files and URLs before treating them as current facts."
-    )
+    return f"\n{text}"
 
 
 def _estimate_tokens(text: str) -> int:

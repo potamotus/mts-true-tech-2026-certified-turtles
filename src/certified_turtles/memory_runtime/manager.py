@@ -15,7 +15,6 @@ from .memory_types import (
     MEMORY_FRONTMATTER_EXAMPLE,
     TYPES_SECTION,
     WHAT_NOT_TO_SAVE_SECTION,
-    build_searching_past_context_section,
 )
 from .prompting import build_memory_prompt
 from .storage import (
@@ -43,6 +42,7 @@ _RUNTIME: "ClaudeLikeMemoryRuntime | None" = None
 
 _COMPACT_MIN_KEEP_TOKENS = 10_000
 _COMPACT_MIN_KEEP_TEXT_MSGS = 5
+_COMPACT_MAX_KEEP_TOKENS = 40_000
 
 # ── Microcompact constants ───────────────────────────────────
 
@@ -258,11 +258,12 @@ class ClaudeLikeMemoryRuntime:
 
     # ── compaction (4a) — session-memory-first, then full LLM compact ──
 
-    _consecutive_compact_failures: int = 0
+    _consecutive_compact_failures: dict[str, int] = {}
 
     def _compact_if_needed(self, messages: list[dict[str, Any]], session_id: str) -> list[dict[str, Any]]:
         total_tokens = self._estimate_message_tokens(messages)
-        if total_tokens < _compact_threshold():
+        threshold = _compact_threshold()
+        if total_tokens < threshold:
             return messages
 
         # Strategy 1: session-memory compact (cheap, no LLM call)
@@ -270,21 +271,24 @@ class ClaudeLikeMemoryRuntime:
         if session_mem:
             result = self._session_memory_compact(messages, session_mem)
             if result is not None:
-                _log.debug("compact_if_needed: session-memory compact %d -> %d messages", len(messages), len(result))
-                return result
+                post_tokens = self._estimate_message_tokens(result)
+                if post_tokens < threshold:
+                    _log.debug("compact_if_needed: session-memory compact %d -> %d messages", len(messages), len(result))
+                    return result
 
         # Strategy 2: full 9-section LLM compact
-        if self._consecutive_compact_failures >= MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES:
-            _log.warning("compact_if_needed: circuit breaker open (%d consecutive failures)", self._consecutive_compact_failures)
+        failures = self._consecutive_compact_failures.get(session_id, 0)
+        if failures >= MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES:
+            _log.warning("compact_if_needed: circuit breaker open (%d consecutive failures) session=%s", failures, session_id)
             return messages
 
         result = self._full_compact(messages, session_id)
         if result is not None:
-            self._consecutive_compact_failures = 0
+            self._consecutive_compact_failures[session_id] = 0
             return result
         else:
-            self._consecutive_compact_failures += 1
-            _log.warning("compact_if_needed: full compact failed (failures=%d)", self._consecutive_compact_failures)
+            self._consecutive_compact_failures[session_id] = failures + 1
+            _log.warning("compact_if_needed: full compact failed (failures=%d) session=%s", failures + 1, session_id)
             return messages
 
     def _session_memory_compact(self, messages: list[dict[str, Any]], session_mem: str) -> list[dict[str, Any]] | None:
@@ -294,6 +298,8 @@ class ClaudeLikeMemoryRuntime:
         cut_index = len(messages)
         for i in range(len(messages) - 1, -1, -1):
             msg_tokens = max(1, len(message_text_content(messages[i]).encode("utf-8", errors="replace")) // 4)
+            if kept_tokens + msg_tokens > _COMPACT_MAX_KEEP_TOKENS:
+                break
             kept_tokens += msg_tokens
             if messages[i].get("role") in ("user", "assistant") and message_text_content(messages[i]).strip():
                 text_msgs += 1
@@ -343,7 +349,7 @@ class ClaudeLikeMemoryRuntime:
                 snap.model,
                 compact_messages,
                 temperature=0.0,
-                max_tokens=8192,
+                max_tokens=20_000,
             )
             content = (((raw.get("choices") or [{}])[0].get("message") or {}).get("content")) or ""
         except Exception:
@@ -359,15 +365,15 @@ class ClaudeLikeMemoryRuntime:
             f"{summary}\n\n"
             f"If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), "
             f"read the full transcript at: {transcript_path}\n\n"
-            "Please continue the conversation from where we left off without asking the user any further questions. "
-            "Continue with the last task that you were asked to work on."
+            "Resume directly — do not acknowledge the summary, do not recap what was happening, "
+            "do not preface with 'I'll continue' or similar. Pick up the last task as if the break never happened."
         )
         compacted: list[dict[str, Any]] = []
         for msg in messages:
             if msg.get("role") == "system":
                 compacted.append(msg)
         compacted.append({"role": "user", "content": user_msg})
-        compacted.append({"role": "assistant", "content": "Understood. Continuing from where we left off."})
+        compacted.append({"role": "assistant", "content": ""})
         _log.debug("full_compact: %d -> %d messages", len(messages), len(compacted))
         return compacted
 
@@ -551,6 +557,7 @@ class ClaudeLikeMemoryRuntime:
     # ── extractor prompt (4c, 4d) ────────────────────────────
 
     def _extractor_prompt(self, scope_id: str, messages: list[dict[str, Any]]) -> str:
+        """Match Claude Code's buildExtractAutoOnlyPrompt / opener()."""
         window = _extract_window_size()
         mem_root = memory_dir(scope_id)
         headers = scan_memory_headers(scope_id)
@@ -564,41 +571,53 @@ class ClaudeLikeMemoryRuntime:
                 "Check this list before writing — update an existing file rather than creating a duplicate."
             )
 
-        how_to_save = "\n".join(
-            (
-                "## How to save memories",
-                "",
-                "Saving a memory is a two-step process:",
-                "",
-                "**Step 1** — write the memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
-                "",
-                *MEMORY_FRONTMATTER_EXAMPLE,
-                "",
-                "**Step 2** — add a pointer to that file in `MEMORY.md`. `MEMORY.md` is an index, not a memory — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. It has no frontmatter. Never write memory content directly into `MEMORY.md`.",
-                "",
-                "- `MEMORY.md` is always loaded into your conversation context — lines after 200 will be truncated, so keep the index concise",
-                "- Organize memory semantically by topic, not chronologically",
-                "- Update or remove memories that turn out to be wrong or outdated",
-                "- Do not write duplicate memories. First check if there is an existing memory you can update before writing a new one.",
-            )
-        )
+        # Build how_to_save section (2-step process matching Claude Code)
+        how_to_save = [
+            "## How to save memories",
+            "",
+            "Saving a memory is a two-step process:",
+            "",
+            "**Step 1** — write the memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
+            "",
+            *MEMORY_FRONTMATTER_EXAMPLE,
+            "",
+            "**Step 2** — add a pointer to that file in `MEMORY.md`. `MEMORY.md` is an index, not a memory — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. It has no frontmatter. Never write memory content directly into `MEMORY.md`.",
+            "",
+            "- `MEMORY.md` is always loaded into your system prompt — lines after 200 will be truncated, so keep the index concise",
+            "- Organize memory semantically by topic, not chronologically",
+            "- Update or remove memories that turn out to be wrong or outdated",
+            "- Do not write duplicate memories. First check if there is an existing memory you can update before writing a new one.",
+        ]
 
-        types_text = "\n".join(TYPES_SECTION)
-        what_not_text = "\n".join(WHAT_NOT_TO_SAVE_SECTION)
-
-        return (
-            f"Analyze the most recent ~{window} messages above and use them to update your persistent memory systems.\n\n"
+        # Lean prompt: opener + explicit-save + TYPES + WHAT_NOT_TO_SAVE + how_to_save
+        # NO recall-side sections (WHEN_TO_ACCESS, TRUSTING_RECALL, PERSISTENCE, SEARCHING)
+        parts = [
+            f"You are now acting as the memory extraction subagent. "
+            f"Analyze the most recent ~{window} messages above and use them to update your persistent memory systems.",
+            "",
+            "Available tools: file_read, grep_search, glob_search, read-only shell commands, "
+            "and file_edit/file_write for paths inside the memory directory only.",
+            "",
+            "You have a limited turn budget. file_edit requires a prior file_read of the same file, "
+            "so the efficient strategy is: turn 1 — issue all file_read calls in parallel for every "
+            "file you might update; turn 2 — issue all file_write/file_edit calls in parallel. "
+            "Do not interleave reads and writes across multiple turns.",
+            "",
             f"You MUST only use content from the last ~{window} messages to update your persistent memories. "
             "Do not waste any turns attempting to investigate or verify that content further — "
             f"no grepping source files, no reading code to confirm a pattern exists."
-            f"{manifest_section}\n\n"
+            f"{manifest_section}",
+            "",
             "If the user explicitly asks you to remember something, save it immediately as whichever type fits best. "
-            "If they ask you to forget something, find and remove the relevant entry.\n\n"
-            f"{types_text}\n"
-            f"{what_not_text}\n\n"
-            f"{how_to_save}\n\n"
-            f"Memory directory: `{mem_root}`"
-        )
+            "If they ask you to forget something, find and remove the relevant entry.",
+            "",
+            *TYPES_SECTION,
+            *WHAT_NOT_TO_SAVE_SECTION,
+            "",
+            *how_to_save,
+        ]
+
+        return "\n".join(parts)
 
     # ── session memory prompt (4e) ───────────────────────────
 

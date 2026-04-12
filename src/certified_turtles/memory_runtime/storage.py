@@ -15,6 +15,20 @@ from typing import Any
 _log = logging.getLogger(__name__)
 
 
+def _emit_memory_event(*, action: str, scope_id: str, filename: str, memory_type: str, name: str) -> None:
+    try:
+        from .events import MemoryEvent, get_event_bus
+        get_event_bus().publish(MemoryEvent(
+            action=action,
+            filename=filename,
+            memory_type=memory_type,
+            name=name,
+            scope_id=scope_id,
+        ))
+    except Exception:
+        pass
+
+
 MAX_MEMORY_FILES = 200
 MAX_MEMORY_INDEX_LINES = 200
 MAX_MEMORY_INDEX_BYTES = 25_000
@@ -303,8 +317,13 @@ def scan_memory_headers(scope_id: str) -> list[MemoryHeader]:
 def format_memory_manifest(headers: list[MemoryHeader]) -> str:
     lines: list[str] = []
     for item in headers:
-        stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(item.mtime))
-        lines.append(f"- [{item.type}] {item.filename} ({stamp}): {item.description}")
+        from datetime import datetime, timezone
+        ts = datetime.fromtimestamp(item.mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{int(item.mtime * 1000) % 1000:03d}Z"
+        tag = f"[{item.type}] " if item.type else ""
+        if item.description:
+            lines.append(f"- {tag}{item.filename} ({ts}): {item.description}")
+        else:
+            lines.append(f"- {tag}{item.filename} ({ts})")
     return "\n".join(lines)
 
 
@@ -330,9 +349,10 @@ def write_memory_file(
         )
     path = resolve_memory_path(scope_id, filename, fallback_name=name)
     path.parent.mkdir(parents=True, exist_ok=True)
+    already_existed = path.exists()
     now = _utc_now_iso()
     created = now
-    if path.exists():
+    if already_existed:
         existing = read_frontmatter(path)
         created = existing.get("created", now)
     payload = (
@@ -348,6 +368,17 @@ def write_memory_file(
     )
     _atomic_write_text(path, payload, encoding="utf-8")
     rebuild_memory_index(scope_id)
+    try:
+        rel = str(path.resolve().relative_to(memory_dir(scope_id).resolve()))
+    except ValueError:
+        rel = path.name
+    _emit_memory_event(
+        action="updated" if already_existed else "created",
+        scope_id=scope_id,
+        filename=rel,
+        memory_type=kind,
+        name=name,
+    )
     return path
 
 
@@ -355,8 +386,16 @@ def delete_memory_file(scope_id: str, filename: str) -> bool:
     path = resolve_memory_path(scope_id, filename, fallback_name="memory")
     if not path.is_file():
         return False
+    fm = read_frontmatter(path)
     path.unlink()
     rebuild_memory_index(scope_id)
+    _emit_memory_event(
+        action="deleted",
+        scope_id=scope_id,
+        filename=filename,
+        memory_type=fm.get("type", "project"),
+        name=fm.get("name", filename),
+    )
     return True
 
 

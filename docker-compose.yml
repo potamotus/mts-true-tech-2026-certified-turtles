@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.8.5
+    build: ./open-webui
     container_name: open-webui
     depends_on:
       - api
@@ -70,10 +70,12 @@ services:
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-ru-RU}
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-in-production}
       WEBUI_URL: ${WEBUI_URL:-http://localhost:3000}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
       # Только ошибки UI; статус запросов к MWS смотри в логах сервиса api ([backend]).
       GLOBAL_LOG_LEVEL: ERROR
       HF_HUB_DISABLE_PROGRESS_BARS: "1"
       TRANSFORMERS_VERBOSITY: error
+      CT_API_BASE: http://api:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

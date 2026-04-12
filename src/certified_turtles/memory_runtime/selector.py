@@ -69,9 +69,10 @@ def select_relevant_memories(
         {"role": "system", "content": SELECTOR_SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": f"Query:\n{query}\n\nAvailable memories:\n{manifest}{tools_suffix}\n\nReturn JSON only.",
+            "content": f"Query: {query}\n\nAvailable memories:\n{manifest}{tools_suffix}",
         },
     ]
+    available = {h.filename for h in headers}
     try:
         raw = client.chat_completions(
             model,
@@ -84,9 +85,8 @@ def select_relevant_memories(
         parsed = json.loads(content)
         selected = parsed.get("selected_memories", [])
         if isinstance(selected, list):
-            valid = [x for x in selected if isinstance(x, str) and x.endswith(".md")]
+            valid = [x for x in selected if isinstance(x, str) and x in available]
             return valid[:limit]
-        # LLM returned non-list for selected_memories — fall back
-        return fallback_select(headers, query, limit=limit, recent_tools=recent_tools)
+        return []
     except Exception:
-        return fallback_select(headers, query, limit=limit, recent_tools=recent_tools)
+        return []

@@ -610,20 +610,20 @@ class TestSelector:
         result = select_relevant_memories(client, model="test", query="Python help", headers=headers)
         assert result == ["a.md"]
 
-    def test_select_relevant_memories_llm_error_falls_back(self):
-        """При ошибке LLM → fallback на keyword matching."""
+    def test_select_relevant_memories_llm_error_returns_empty(self):
+        """При ошибке LLM → пустой список (как в Claude Code)."""
         headers = [self._make_header("python.md", "Python", "Python programming")]
         client = MagicMock()
         client.chat_completions.side_effect = Exception("API error")
         result = select_relevant_memories(client, model="test", query="Python help", headers=headers)
-        assert "python.md" in result
+        assert result == []
 
-    def test_select_relevant_memories_llm_returns_non_md(self):
-        """LLM возвращает файлы не .md → фильтруются."""
+    def test_select_relevant_memories_llm_returns_non_existent(self):
+        """LLM возвращает файлы не из доступных → фильтруются."""
         headers = [self._make_header("a.md", "A", "about A")]
         client = MagicMock()
         client.chat_completions.return_value = {
-            "choices": [{"message": {"content": '{"selected_memories": ["a.txt", "a.md"]}'}}]
+            "choices": [{"message": {"content": '{"selected_memories": ["nonexistent.md", "a.md"]}'}}]
         }
         result = select_relevant_memories(client, model="test", query="about A", headers=headers)
         assert result == ["a.md"]

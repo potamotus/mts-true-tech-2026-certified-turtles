@@ -4,7 +4,11 @@ import json
 import time
 from typing import Any
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from certified_turtles.agent_debug_log import configure_agent_debug_from_env
 from certified_turtles.backend_log import get_backend_logger
@@ -14,6 +18,7 @@ from certified_turtles.tools.builtins.google_docs import google_docs_capability_
 
 from certified_turtles.api.agent import router as agent_router
 from certified_turtles.api.files import router as files_router
+from certified_turtles.api.memory import router as memory_router
 from certified_turtles.api.openai_proxy import router as openai_proxy_router
 from certified_turtles.api.uploads import router as uploads_router
 
@@ -27,6 +32,14 @@ app = FastAPI(
         "(`/v1/*` — агент с тулами; `/v1/plain/*` — обычный чат), "
         "`/api/v1/agent/chat`, загрузки `POST /api/v1/uploads`, раздача `/files/*`."
     ),
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -137,6 +150,26 @@ app.include_router(openai_proxy_router)
 app.include_router(files_router)
 app.include_router(agent_router, prefix="/api/v1")
 app.include_router(uploads_router, prefix="/api/v1")
+app.include_router(memory_router, prefix="/api/v1")
+
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@app.get("/memory")
+async def memory_page():
+    return FileResponse(_STATIC_DIR / "memory.html", media_type="text/html")
+
+
+@app.get("/static/{filename}")
+async def serve_static(filename: str):
+    path = _STATIC_DIR / filename
+    if not path.is_file():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
+    suffix_map = {".js": "application/javascript", ".css": "text/css", ".html": "text/html"}
+    media = suffix_map.get(path.suffix, "application/octet-stream")
+    return FileResponse(path, media_type=media)
 
 
 @app.get("/health")

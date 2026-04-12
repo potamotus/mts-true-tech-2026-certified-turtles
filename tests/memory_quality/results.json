@@ -1,0 +1,1724 @@
+{
+  "explicit_pref_python_ru": {
+    "scenario_id": "explicit_pref_python_ru",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "python"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Запомни, что я предпочитаю Python"
+      }
+    ],
+    "description": "Явная просьба запомнить предпочтение языка (рус)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: user_preferences\ndescription: User prefers Python\n Cumulative preference and role details\n type: user\n---\nPreferred language: Python"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: user_preferences\ndescription: User prefers Python\n Cumulative preference and role details\n type: user\n---\nPreferred language: Python"
+      }
+    ],
+    "scope_id": "mqtest-explicit_pref_python_ru-0f805f2a",
+    "session_id": "mqsess-explicit_pref_python_ru-0f805f2a",
+    "self_check": "OK"
+  },
+  "explicit_github_ru": {
+    "scenario_id": "explicit_github_ru",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "github"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Сохрани это: мой GitHub — github.com/testuser"
+      }
+    ],
+    "description": "Явная просьба сохранить ссылку на GitHub (рус)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_github.md",
+        "content": "---\nname: user github\ndescription: Сохранение профиля GitHub пользователя\n type: user\n---\nGitHub пользователя: github.com/testuser\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_github.md",
+        "content": "---\nname: user github\ndescription: Сохранение профиля GitHub пользователя\n type: user\n---\nGitHub пользователя: github.com/testuser\n"
+      }
+    ],
+    "scope_id": "mqtest-explicit_github_ru-cd72dfe4",
+    "session_id": "mqsess-explicit_github_ru-cd72dfe4",
+    "self_check": "OK"
+  },
+  "explicit_framework_en": {
+    "scenario_id": "explicit_framework_en",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "fastapi"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Please remember that I always use FastAPI for backends"
+      }
+    ],
+    "description": "Explicit remember — framework preference (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_fastapi_backend.md",
+        "content": "---\nname: User's backend framework preference\ndescription: User consistently uses FastAPI for backend development\n...user: always use FastAPI for backends\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_fastapi_backend.md",
+        "content": "---\nname: User's backend framework preference\ndescription: User consistently uses FastAPI for backend development\n...user: always use FastAPI for backends\n"
+      }
+    ],
+    "scope_id": "mqtest-explicit_framework_en-774deb55",
+    "session_id": "mqsess-explicit_framework_en-774deb55",
+    "self_check": "OK"
+  },
+  "explicit_work_mts_en": {
+    "scenario_id": "explicit_work_mts_en",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "mts",
+      "backend"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Remember: I work at MTS as a backend engineer"
+      }
+    ],
+    "description": "Explicit remember — workplace and role (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: User Role\ndescription: User works at MTS as a backend engineer\n累ype: user\n---\n\nUser works at MTS as a backend engineer"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: User Role\ndescription: User works at MTS as a backend engineer\n累ype: user\n---\n\nUser works at MTS as a backend engineer"
+      }
+    ],
+    "scope_id": "mqtest-explicit_work_mts_en-eab6dcbd",
+    "session_id": "mqsess-explicit_work_mts_en-eab6dcbd",
+    "self_check": "OK"
+  },
+  "explicit_os_en": {
+    "scenario_id": "explicit_os_en",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "macos",
+      "zsh"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Remember: I use macOS with zsh"
+      }
+    ],
+    "description": "Explicit remember — OS and shell (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_os_preference.md",
+        "content": "---\nname: User OS Preference\ndescription: The user uses macOS with zsh. Useful for shell command recommendations.\ntype: user\n---\n\nThe user prefers macOS with zsh shell."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_os_preference.md",
+        "content": "---\nname: User OS Preference\ndescription: The user uses macOS with zsh. Useful for shell command recommendations.\ntype: user\n---\n\nThe user prefers macOS with zsh shell."
+      }
+    ],
+    "scope_id": "mqtest-explicit_os_en-575e4907",
+    "session_id": "mqsess-explicit_os_en-575e4907",
+    "self_check": "OK"
+  },
+  "explicit_dislike_oop_ru": {
+    "scenario_id": "explicit_dislike_oop_ru",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "ооп",
+      "oop"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Пожалуйста, запомни — я не люблю ООП"
+      }
+    ],
+    "description": "Явная просьба запомнить антипредпочтение (рус)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_not_like_oop.md",
+        "content": "---\nname: user_dislike_oop\ndescription: User prefers procedual programming over OOP\n累ype: user\n---\nI dislike OOP."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_not_like_oop.md",
+        "content": "---\nname: user_dislike_oop\ndescription: User prefers procedual programming over OOP\n累ype: user\n---\nI dislike OOP."
+      }
+    ],
+    "scope_id": "mqtest-explicit_dislike_oop_ru-8a1146d5",
+    "session_id": "mqsess-explicit_dislike_oop_ru-8a1146d5",
+    "self_check": "OK"
+  },
+  "explicit_deadline_ru": {
+    "scenario_id": "explicit_deadline_ru",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "дедлайн",
+      "апрел",
+      "deadline"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Хочу чтобы ты помнил: дедлайн 15 апреля"
+      }
+    ],
+    "description": "Явная просьба запомнить дедлайн (рус)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_deadline.md",
+        "content": "---\nname: project_deadline\ndescription: Дедлайн для текущего проекта.\ntype: project\n---\n\nДедлайн для текущего проекта установлен на 15 апреля. Проверьте все запланированные задачи и убедитесь, что они соответствуют расписанию."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_deadline.md",
+        "content": "---\nname: project_deadline\ndescription: Дедлайн для текущего проекта.\ntype: project\n---\n\nДедлайн для текущего проекта установлен на 15 апреля. Проверьте все запланированные задачи и убедитесь, что они соответствуют расписанию."
+      }
+    ],
+    "scope_id": "mqtest-explicit_deadline_ru-3a917861",
+    "session_id": "mqsess-explicit_deadline_ru-3a917861",
+    "self_check": "OK"
+  },
+  "explicit_name_ru": {
+    "scenario_id": "explicit_name_ru",
+    "category": "explicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "алексей"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Запомни, меня зовут Алексей"
+      }
+    ],
+    "description": "Явная просьба запомнить имя (рус)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_name.md",
+        "content": "---\nname: user_name\ndescription: User's name for personalized interaction\ntype: user\n---\nUser's name is Alexey."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_name.md",
+        "content": "---\nname: user_name\ndescription: User's name for personalized interaction\ntype: user\n---\nUser's name is Alexey."
+      }
+    ],
+    "scope_id": "mqtest-explicit_name_ru-48b9cbac",
+    "session_id": "mqsess-explicit_name_ru-48b9cbac",
+    "self_check": "OK"
+  },
+  "implicit_typescript": {
+    "scenario_id": "implicit_typescript",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "typescript"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я всегда пишу на TypeScript"
+      }
+    ],
+    "description": "Неявное предпочтение языка",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user prefers typescript.md",
+        "content": "---\nname: user prefers using TypeScript\ndescription: User consistently uses TypeScript and is likely comfortable with its syntax and features.\ntype: user\n---\n\nUser expresses preference for working in TypeScript."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user prefers typescript.md",
+        "content": "---\nname: user prefers using TypeScript\ndescription: User consistently uses TypeScript and is likely comfortable with its syntax and features.\ntype: user\n---\n\nUser expresses preference for working in TypeScript."
+      }
+    ],
+    "scope_id": "mqtest-implicit_typescript-c7147b35",
+    "session_id": "mqsess-implicit_typescript-c7147b35",
+    "self_check": "OK"
+  },
+  "implicit_vim": {
+    "scenario_id": "implicit_vim",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "vim"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я обычно использую Vim"
+      }
+    ],
+    "description": "Неявное предпочтение редактора",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_vim.md",
+        "content": "---\nname: User Vim Editor Preference\ndescription: The user has expressed their usual use of Vim editor\n(type: user)\n---\nuser has expressed their usual use of Vim editor \n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_vim.md",
+        "content": "---\nname: User Vim Editor Preference\ndescription: The user has expressed their usual use of Vim editor\n(type: user)\n---\nuser has expressed their usual use of Vim editor \n"
+      }
+    ],
+    "scope_id": "mqtest-implicit_vim-d0772944",
+    "session_id": "mqsess-implicit_vim-d0772944",
+    "self_check": "OK"
+  },
+  "implicit_short_answers": {
+    "scenario_id": "implicit_short_answers",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "коротк",
+      "длинн"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Ненавижу длинные ответы"
+      }
+    ],
+    "description": "Неявный фидбек о длине ответов",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "feedback.md",
+        "content": "---\nname: Feedback on response length\ndescription: User prefers concise responses\n累ype: feedback\n---\n\nFeedback on response length: User prefers terse, concise responses without unnecessary details. Why: The user expressed strong dislike for long answers. How to apply: tailor responses to be direct and to the point, minimizing wordiness and redundancy."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "feedback.md",
+        "content": "---\nname: Feedback on response length\ndescription: User prefers concise responses\n累ype: feedback\n---\n\nFeedback on response length: User prefers terse, concise responses without unnecessary details. Why: The user expressed strong dislike for long answers. How to apply: tailor responses to be direct and to the point, minimizing wordiness and redundancy."
+      }
+    ],
+    "scope_id": "mqtest-implicit_short_answers-8dd58c14",
+    "session_id": "mqsess-implicit_short_answers-8dd58c14",
+    "self_check": "OK"
+  },
+  "implicit_functional": {
+    "scenario_id": "implicit_functional",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "функциональн"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мне нравится функциональный стиль программирования"
+      }
+    ],
+    "description": "Неявное предпочтение стиля",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_functional_style.md",
+        "content": "---\nname: user_functional_style\ndescription: The user prefers functional programming style\n type: user\n---\n\nThe user has a preference for functional programming style."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_functional_style.md",
+        "content": "---\nname: user_functional_style\ndescription: The user prefers functional programming style\n type: user\n---\n\nThe user has a preference for functional programming style."
+      }
+    ],
+    "scope_id": "mqtest-implicit_functional-44a47e20",
+    "session_id": "mqsess-implicit_functional-44a47e20",
+    "self_check": "OK"
+  },
+  "implicit_senior_backend": {
+    "scenario_id": "implicit_senior_backend",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "senior",
+      "backend"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я senior backend developer"
+      }
+    ],
+    "description": "Неявная информация о роли",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: Senior Backend Developer\ndescription: The user is a senior backend developer.\ntype: user\n---\n\nThe user identified themselves as a senior backend developer."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: Senior Backend Developer\ndescription: The user is a senior backend developer.\ntype: user\n---\n\nThe user identified themselves as a senior backend developer."
+      }
+    ],
+    "scope_id": "mqtest-implicit_senior_backend-81e3bb81",
+    "session_id": "mqsess-implicit_senior_backend-81e3bb81",
+    "self_check": "OK"
+  },
+  "implicit_docker_always": {
+    "scenario_id": "implicit_docker_always",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "docker"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "I always deploy with Docker and docker-compose"
+      }
+    ],
+    "description": "Implicit deployment preference (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_deployment_preferences.md",
+        "content": "---\nname: User Deployment Preferences\ndescription: User prefers deploying with Docker and docker-compose\n:type: user\n---\nUser has shared they routinely deploy applications using Docker and docker-compose."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_deployment_preferences.md",
+        "content": "---\nname: User Deployment Preferences\ndescription: User prefers deploying with Docker and docker-compose\n:type: user\n---\nUser has shared they routinely deploy applications using Docker and docker-compose."
+      }
+    ],
+    "scope_id": "mqtest-implicit_docker_always-0912e416",
+    "session_id": "mqsess-implicit_docker_always-0912e416",
+    "self_check": "OK"
+  },
+  "feedback_no_emoji": {
+    "scenario_id": "feedback_no_emoji",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "emoji"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Не используй emoji в ответах"
+      }
+    ],
+    "description": "Фидбек: не использовать эмодзи",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "feedback_no_emoji.md",
+        "content": "---\nname: No emoji in replies\ndescription: User prefers responses without emojis to maintain a formal tone\ntype: feedback\n---\nUser prefers responses without emojis. Why: Maintain a formal tone in communication. How to apply: Ensure all replies are emoji-free."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "feedback_no_emoji.md",
+        "content": "---\nname: No emoji in replies\ndescription: User prefers responses without emojis to maintain a formal tone\ntype: feedback\n---\nUser prefers responses without emojis. Why: Maintain a formal tone in communication. How to apply: Ensure all replies are emoji-free."
+      }
+    ],
+    "scope_id": "mqtest-feedback_no_emoji-2d1c0376",
+    "session_id": "mqsess-feedback_no_emoji-2d1c0376",
+    "self_check": "OK"
+  },
+  "implicit_linux_server": {
+    "scenario_id": "implicit_linux_server",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "ubuntu"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мои серверы все на Ubuntu 22.04"
+      }
+    ],
+    "description": "Неявная информация об инфраструктуре",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_servers.md",
+        "content": "---\nname: User Server OS\ndescription: User operates servers running Ubuntu 22.04\n累type: user\n---\n\nUser operates servers running Ubuntu 22.04."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "****MEMORY.md",
+        "content": "- [User Server OS](user_servers.md) — User operates servers running Ubuntu 22.04\n"
+      },
+      {
+        "filename": "user_servers.md",
+        "content": "---\nname: User Server OS\ndescription: User operates servers running Ubuntu 22.04\n累type: user\n---\n\nUser operates servers running Ubuntu 22.04."
+      }
+    ],
+    "scope_id": "mqtest-implicit_linux_server-482d65c5",
+    "session_id": "mqsess-implicit_linux_server-482d65c5",
+    "self_check": "OK"
+  },
+  "implicit_testing_pytest": {
+    "scenario_id": "implicit_testing_pytest",
+    "category": "implicit",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "pytest"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Для тестов я всегда использую pytest"
+      }
+    ],
+    "description": "Неявное предпочтение тестового фреймворка",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_preferred_pytest.md",
+        "content": "---\nname: User prefers pytest\ndescription: The user consistently uses pytest for tests.\ntype: user\n---\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_preferred_pytest.md",
+        "content": "---\nname: User prefers pytest\ndescription: The user consistently uses pytest for tests.\ntype: user\n---\n"
+      }
+    ],
+    "scope_id": "mqtest-implicit_testing_pytest-e87c6e57",
+    "session_id": "mqsess-implicit_testing_pytest-e87c6e57",
+    "self_check": "OK"
+  },
+  "feedback_comments_english": {
+    "scenario_id": "feedback_comments_english",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "комментари",
+      "английск"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Пиши комментарии на английском, а не на русском"
+      }
+    ],
+    "description": "Фидбек: язык комментариев",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_language_preference.md",
+        "content": "---\nname: User Language Preference\ndescription: The user's language preference for interaction\ntype: user\n---\nThe user prefers to communicate in English."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_language_preference.md",
+        "content": "---\nname: User Language Preference\ndescription: The user's language preference for interaction\ntype: user\n---\nThe user prefers to communicate in English."
+      }
+    ],
+    "scope_id": "mqtest-feedback_comments_english-0b221aa1",
+    "session_id": "mqsess-feedback_comments_english-0b221aa1",
+    "self_check": "OK"
+  },
+  "feedback_no_libs": {
+    "scenario_id": "feedback_no_libs",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "библиотек"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Не предлагай библиотеки без необходимости"
+      }
+    ],
+    "description": "Фидбек: не предлагать лишние библиотеки",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "feedback_no_libs.md",
+        "content": "---\nname: feedback_no_libs\ndescription: User prefers not to be prompted with libraries unnecessarily\n...\ntype: feedback\n---\nAvoid suggesting libraries without necessity — User finds this unnecessary. How to apply: only suggest libraries when explicitly asked by the user."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "feedback_no_libs.md",
+        "content": "---\nname: feedback_no_libs\ndescription: User prefers not to be prompted with libraries unnecessarily\n...\ntype: feedback\n---\nAvoid suggesting libraries without necessity — User finds this unnecessary. How to apply: only suggest libraries when explicitly asked by the user."
+      }
+    ],
+    "scope_id": "mqtest-feedback_no_libs-ef2ee804",
+    "session_id": "mqsess-feedback_no_libs-ef2ee804",
+    "self_check": "OK"
+  },
+  "feedback_no_docstrings": {
+    "scenario_id": "feedback_no_docstrings",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "docstring"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Don't add docstrings unless I ask for them"
+      }
+    ],
+    "description": "Feedback: no unnecessary docstrings (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "feedback_add_docstrings.md",
+        "content": "---\nname: Feedback add docstrings\ndescription: The user prefers no docstrings unless explicitly asked for\n type: feedback\n---\nPrefer not to add docstrings unless specifically instructed to do so. Why: user preference. How to apply: default to no docstrings unless asked."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "feedback_add_docstrings.md",
+        "content": "---\nname: Feedback add docstrings\ndescription: The user prefers no docstrings unless explicitly asked for\n type: feedback\n---\nPrefer not to add docstrings unless specifically instructed to do so. Why: user preference. How to apply: default to no docstrings unless asked."
+      }
+    ],
+    "scope_id": "mqtest-feedback_no_docstrings-948e682e",
+    "session_id": "mqsess-feedback_no_docstrings-948e682e",
+    "self_check": "OK"
+  },
+  "feedback_type_hints": {
+    "scenario_id": "feedback_type_hints",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "type hint"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Всегда добавляй type hints в Python"
+      }
+    ],
+    "description": "Фидбек: всегда type hints",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: User_Preferences\ndescription: User prefers type hints in Python\n...\ntype: user\n---\nStrong preference for using type hints in Python code to improve code readability and ease of maintenance."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: User_Preferences\ndescription: User prefers type hints in Python\n...\ntype: user\n---\nStrong preference for using type hints in Python code to improve code readability and ease of maintenance."
+      }
+    ],
+    "scope_id": "mqtest-feedback_type_hints-fe21c811",
+    "session_id": "mqsess-feedback_type_hints-fe21c811",
+    "self_check": "OK"
+  },
+  "project_stack": {
+    "scenario_id": "project_stack",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "fastapi",
+      "webui"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мы решили использовать FastAPI + Open WebUI"
+      }
+    ],
+    "description": "Проектный контекст: технологический стек",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_stack.md",
+        "content": "---\nname: Project Stack\ndescription: We decided to use FastAPI + Open WebUI for the project.\ntype: project\n---\nWe decided to use FastAPI + Open WebUI for the project.\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_stack.md",
+        "content": "---\nname: Project Stack\ndescription: We decided to use FastAPI + Open WebUI for the project.\ntype: project\n---\nWe decided to use FastAPI + Open WebUI for the project.\n"
+      }
+    ],
+    "scope_id": "mqtest-project_stack-5a96b5e4",
+    "session_id": "mqsess-project_stack-5a96b5e4",
+    "self_check": "OK"
+  },
+  "feedback_explain_briefly": {
+    "scenario_id": "feedback_explain_briefly",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "коротк"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Объясняй коротко, без воды"
+      }
+    ],
+    "description": "Фидбек: краткие объяснения",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "feedback_brief.md",
+        "content": "---\nname: brief_responses\ndescription: User prefers concise responses without summaries.\ntype: feedback\n---\nprefer terse responses without trailing summaries. Why: user reads diffs directly. How to apply: default to concise closings"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "feedback_brief.md",
+        "content": "---\nname: brief_responses\ndescription: User prefers concise responses without summaries.\ntype: feedback\n---\nprefer terse responses without trailing summaries. Why: user reads diffs directly. How to apply: default to concise closings"
+      }
+    ],
+    "scope_id": "mqtest-feedback_explain_briefly-b234de77",
+    "session_id": "mqsess-feedback_explain_briefly-b234de77",
+    "self_check": "OK"
+  },
+  "project_wikilive": {
+    "scenario_id": "project_wikilive",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "wikilive",
+      "mts"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мы делаем проект WikiLive для хакатона MTS True Tech"
+      }
+    ],
+    "description": "Проектный контекст: название и хакатон",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_wikilive_hackathon_mts_true_tech.md",
+        "content": "---\nname: WikiLive Hackathon MTS True Tech\ndescription: Project WikiLive is being developed for the MTS True Tech hackathon.\ntype: project\n---\n\nProject WikiLive is being targeted for the MTS True Tech hackathon. This is an external event independent of the code state and repository."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_wikilive_hackathon_mts_true_tech.md",
+        "content": "---\nname: WikiLive Hackathon MTS True Tech\ndescription: Project WikiLive is being developed for the MTS True Tech hackathon.\ntype: project\n---\n\nProject WikiLive is being targeted for the MTS True Tech hackathon. This is an external event independent of the code state and repository."
+      }
+    ],
+    "scope_id": "mqtest-project_wikilive-da9129ef",
+    "session_id": "mqsess-project_wikilive-da9129ef",
+    "self_check": "OK"
+  },
+  "project_deadline": {
+    "scenario_id": "project_deadline",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "дедлайн",
+      "апрел",
+      "2026"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Дедлайн нашего проекта — 15 апреля 2026"
+      }
+    ],
+    "description": "Проектный контекст: дедлайн",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_deadline.md",
+        "content": "---\nname: project_deadline\ndescription: The project deadline is April 15, 2026.\ntype: project\n---\nThe deadline for the project is April 15, 2026. Why: User specified. How to apply: Any milestone planning or task scheduling should not exceed this date."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_deadline.md",
+        "content": "---\nname: project_deadline\ndescription: The project deadline is April 15, 2026.\ntype: project\n---\nThe deadline for the project is April 15, 2026. Why: User specified. How to apply: Any milestone planning or task scheduling should not exceed this date."
+      }
+    ],
+    "scope_id": "mqtest-project_deadline-f26d5609",
+    "session_id": "mqsess-project_deadline-f26d5609",
+    "self_check": "OK"
+  },
+  "project_team": {
+    "scenario_id": "project_team",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "potamotus",
+      "команд"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "В команде 4 человека: Potamotus, AsonglefacMillenium, nikitavivat, timsonyk"
+      }
+    ],
+    "description": "Проектный контекст: состав команды",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_team_members.md",
+        "content": "---\nname: team_members\ndescription: The current team composition.\ntype: project\n---\nThe team consists of 4 members: Potamotus, AsonglefacMillenium, nikitavivat, timsonyk.\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_team_members.md",
+        "content": "---\nname: team_members\ndescription: The current team composition.\ntype: project\n---\nThe team consists of 4 members: Potamotus, AsonglefacMillenium, nikitavivat, timsonyk.\n"
+      }
+    ],
+    "scope_id": "mqtest-project_team-023f37aa",
+    "session_id": "mqsess-project_team-023f37aa",
+    "self_check": "OK"
+  },
+  "ref_mws_api_docs": {
+    "scenario_id": "ref_mws_api_docs",
+    "category": "reference",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "mws",
+      "api",
+      "docs"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Документация MWS API: https://api.gpt.mws.ru/docs"
+      }
+    ],
+    "description": "Ссылка на документацию API",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "MWS_API_Documentation.md",
+        "content": "---\nname: MWS API Documentation\ndescription: The user provided the MWS API documentation URL\n...: reference\n---\nThe MWS API documentation is available [here](https://api.gpt.mws.ru/docs)."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "MWS_API_Documentation.md",
+        "content": "---\nname: MWS API Documentation\ndescription: The user provided the MWS API documentation URL\n...: reference\n---\nThe MWS API documentation is available [here](https://api.gpt.mws.ru/docs)."
+      }
+    ],
+    "scope_id": "mqtest-ref_mws_api_docs-627f90e4",
+    "session_id": "mqsess-ref_mws_api_docs-627f90e4",
+    "self_check": "OK"
+  },
+  "ref_issue_tracker": {
+    "scenario_id": "ref_issue_tracker",
+    "category": "reference",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "github",
+      "issues"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Наш трекер задач: https://github.com/potamotus/mts-true-tech-2026/issues"
+      }
+    ],
+    "description": "Ссылка на трекер задач",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "reference_trackermemory.md",
+        "content": "---\nname: GitHub Tracker for MTS True Tech 2026\ndescription: Pointer to task tracker for MTS True Tech 2026\n\ntype: reference\n\n---\n\n Pipeline incidents are tracked in [GitHub](https://github.com/potamotus/mts-true-tech-2026/issues)\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "reference_trackermemory.md",
+        "content": "---\nname: GitHub Tracker for MTS True Tech 2026\ndescription: Pointer to task tracker for MTS True Tech 2026\n\ntype: reference\n\n---\n\n Pipeline incidents are tracked in [GitHub](https://github.com/potamotus/mts-true-tech-2026/issues)\n"
+      }
+    ],
+    "scope_id": "mqtest-ref_issue_tracker-baeb95c1",
+    "session_id": "mqsess-ref_issue_tracker-baeb95c1",
+    "self_check": "OK"
+  },
+  "project_freeze_merges": {
+    "scenario_id": "project_freeze_merges",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "мердж",
+      "main",
+      "апрел"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мы замораживаем мерджи в main до 14 апреля"
+      }
+    ],
+    "description": "Проектный контекст: заморозка мерджей",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_merge_freeze.md",
+        "content": "---\nname: merge_freeze_main\ndescription: Non-critical merges frozen until April 14th\n\n---\nMerge freeze in main until 14 April."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_merge_freeze.md",
+        "content": "---\nname: merge_freeze_main\ndescription: Non-critical merges frozen until April 14th\n\n---\nMerge freeze in main until 14 April."
+      }
+    ],
+    "scope_id": "mqtest-project_freeze_merges-7e0c2189",
+    "session_id": "mqsess-project_freeze_merges-7e0c2189",
+    "self_check": "OK"
+  },
+  "ref_confluence": {
+    "scenario_id": "ref_confluence",
+    "category": "reference",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "confluence",
+      "design"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Our design docs are at https://confluence.example.com/wiki/project"
+      }
+    ],
+    "description": "Reference: design docs link (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "reference_confluence.md",
+        "content": "---\nname: Confluence Docs Reference\ndescription: Reference to the design docs location\n type: reference\n---\n\nThe design docs are located at https://confluence.example.com/wiki/project."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "reference_confluence.md",
+        "content": "---\nname: Confluence Docs Reference\ndescription: Reference to the design docs location\n type: reference\n---\n\nThe design docs are located at https://confluence.example.com/wiki/project."
+      }
+    ],
+    "scope_id": "mqtest-ref_confluence-cb842568",
+    "session_id": "mqsess-ref_confluence-cb842568",
+    "self_check": "OK"
+  },
+  "ref_staging_url": {
+    "scenario_id": "ref_staging_url",
+    "category": "reference",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "staging"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Staging environment: https://staging.wikilive.example.com"
+      }
+    ],
+    "description": "Reference: staging URL (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "staging_environment_reference.md",
+        "content": "---\nname: staging_environment_ref\ndescription: Reference for the staging environment URL\n type: reference\n---\nStaging environment: https://staging.wikilive.example.com"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "staging_environment_reference.md",
+        "content": "---\nname: staging_environment_ref\ndescription: Reference for the staging environment URL\n type: reference\n---\nStaging environment: https://staging.wikilive.example.com"
+      }
+    ],
+    "scope_id": "mqtest-ref_staging_url-515408b9",
+    "session_id": "mqsess-ref_staging_url-515408b9",
+    "self_check": "OK"
+  },
+  "ref_figma": {
+    "scenario_id": "ref_figma",
+    "category": "reference",
+    "should_save": true,
+    "expected_memory_type": "reference",
+    "keywords": [
+      "figma"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Вот Figma макет: https://figma.com/file/abc123"
+      }
+    ],
+    "description": "Ссылка на Figma",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "reference_figma_maket.md",
+        "content": "---\nname: reference_figma_maket\ndescription: Figma макет предоставленный пользователем\n\ntype: reference\n\n---\nFigma макет: https://figma.com/file/abc123\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "reference_figma_maket.md",
+        "content": "---\nname: reference_figma_maket\ndescription: Figma макет предоставленный пользователем\n\ntype: reference\n\n---\nFigma макет: https://figma.com/file/abc123\n"
+      }
+    ],
+    "scope_id": "mqtest-ref_figma-154fd65b",
+    "session_id": "mqsess-ref_figma-154fd65b",
+    "self_check": "OK"
+  },
+  "project_decision_db": {
+    "scenario_id": "project_decision_db",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "postgresql",
+      "database"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "We decided to use PostgreSQL for the database"
+      }
+    ],
+    "description": "Project decision: database choice (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "database_decision.md",
+        "content": "---\nname: Database Decision\ndescription: The project will use PostgreSQL for the database\ntype: project\n---\nWe have decided to use PostgreSQL for the database. \n\n**Why:** PostgreSQL was chosen for its robustness and feature set. \n\n**How to apply:** All database-related work should plan to use PostgreSQL. "
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "database_decision.md",
+        "content": "---\nname: Database Decision\ndescription: The project will use PostgreSQL for the database\ntype: project\n---\nWe have decided to use PostgreSQL for the database. \n\n**Why:** PostgreSQL was chosen for its robustness and feature set. \n\n**How to apply:** All database-related work should plan to use PostgreSQL. "
+      }
+    ],
+    "scope_id": "mqtest-project_decision_db-fe43a166",
+    "session_id": "mqsess-project_decision_db-fe43a166",
+    "self_check": "OK"
+  },
+  "project_repo": {
+    "scenario_id": "project_repo",
+    "category": "project",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "github",
+      "potamotus"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Наш репозиторий: github.com/potamotus/mts-true-tech-2026"
+      }
+    ],
+    "description": "Проектный контекст: репозиторий",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "repo_link.md",
+        "content": "---\nname: The Repository Link\ndescription: The user has specified the repository location.\ntype: reference\n---\n\nThe repository for this project is located at: [mtstrue/mts-true-tech](https://github.com/potamotus/mts-true-tech-2026).\\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "repo_link.md",
+        "content": "---\nname: The Repository Link\ndescription: The user has specified the repository location.\ntype: reference\n---\n\nThe repository for this project is located at: [mtstrue/mts-true-tech](https://github.com/potamotus/mts-true-tech-2026).\\n"
+      }
+    ],
+    "scope_id": "mqtest-project_repo-63decc05",
+    "session_id": "mqsess-project_repo-63decc05",
+    "self_check": "OK"
+  },
+  "feedback_too_verbose": {
+    "scenario_id": "feedback_too_verbose",
+    "category": "feedback",
+    "should_save": true,
+    "expected_memory_type": "feedback",
+    "keywords": [
+      "коротк",
+      "многословн"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Ты слишком многословный, отвечай короче"
+      }
+    ],
+    "description": "Фидбек: слишком длинные ответы",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-feedback_too_verbose-6ceeddc3",
+    "session_id": "mqsess-feedback_too_verbose-6ceeddc3",
+    "self_check": "WARN: expected save but nothing saved"
+  },
+  "neg_fix_error": {
+    "scenario_id": "neg_fix_error",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "У меня ошибка TypeError: cannot read property 'map' of undefined, как исправить?"
+      }
+    ],
+    "description": "Вопрос об ошибке",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "TypeErrorMapUndefined.md",
+        "content": "---\nname: TypeErrorMapUndefined\ndescription: Помнить, что у пользователя возникла ошибка TypeError, связанная с свойством 'map', которое он не может применить к undefined.\ntype: user\n---\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "TypeErrorMapUndefined.md",
+        "content": "---\nname: TypeErrorMapUndefined\ndescription: Помнить, что у пользователя возникла ошибка TypeError, связанная с свойством 'map', которое он не может применить к undefined.\ntype: user\n---\n"
+      }
+    ],
+    "scope_id": "mqtest-neg_fix_error-fb38ab70",
+    "session_id": "mqsess-neg_fix_error-fb38ab70",
+    "self_check": "WARN: expected no save but files appeared"
+  },
+  "edge_multiple_facts": {
+    "scenario_id": "edge_multiple_facts",
+    "category": "edge",
+    "should_save": true,
+    "expected_memory_type": null,
+    "keywords": [
+      "ml",
+      "pytorch",
+      "vim"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я — ML-инженер из Москвы, использую PyTorch, люблю vim, дедлайн 20 апреля"
+      }
+    ],
+    "description": "Множество фактов в одном сообщении",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "deadline_info.md",
+        "content": "---\nname: Deadline of April 20th\ndescription: Project deadline details\n\ntype: project\n\n---\n\nThe project has a deadline of April 20th. This was mentioned by the user in the conversation.\n\n"
+      },
+      {
+        "filename": "user_info.md",
+        "content": "---\nname: ML engineer from Moscow\ndescription: User profile details\n\n---\n\nI am an ML engineer from Moscow, using PyTorch and a fan of vim. I have a deadline on April 20th.\n\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "deadline_info.md",
+        "content": "---\nname: Deadline of April 20th\ndescription: Project deadline details\n\ntype: project\n\n---\n\nThe project has a deadline of April 20th. This was mentioned by the user in the conversation.\n\n"
+      },
+      {
+        "filename": "user_info.md",
+        "content": "---\nname: ML engineer from Moscow\ndescription: User profile details\n\n---\n\nI am an ML engineer from Moscow, using PyTorch and a fan of vim. I have a deadline on April 20th.\n\n"
+      }
+    ],
+    "scope_id": "mqtest-edge_multiple_facts-d974e10d",
+    "session_id": "mqsess-edge_multiple_facts-d974e10d",
+    "self_check": "OK"
+  },
+  "edge_long_technical_with_pref": {
+    "scenario_id": "edge_long_technical_with_pref",
+    "category": "edge",
+    "should_save": true,
+    "expected_memory_type": null,
+    "keywords": [
+      "sqlalchemy"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Вот архитектура нашего сервиса: у нас есть API gateway на nginx, за ним FastAPI-бекенд, который ходит в PostgreSQL и Redis. Для очередей используем RabbitMQ. Фронтенд на Next.js. Кстати, я предпочитаю использовать SQLAlchemy вместо raw SQL."
+      }
+    ],
+    "description": "Длинное техническое сообщение с предпочтением внутри",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "system_architecture.md",
+        "content": "---\nname: Системная архитектура\ndescription: Архитектура архитектура сервиса: nginx API gateway, FastAPI backend, PostgreSQL и Redis, RabbitMQ, Next.js frontend.\nviews: 1\ntype: project\n---\nAPI gateway на nginx, FastAPI-бекенд, PostgreSQL и Redis, RabbitMQ для очередей, Next.js фронтенд."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "system_architecture.md",
+        "content": "---\nname: Системная архитектура\ndescription: Архитектура архитектура сервиса: nginx API gateway, FastAPI backend, PostgreSQL и Redis, RabbitMQ, Next.js frontend.\nviews: 1\ntype: project\n---\nAPI gateway на nginx, FastAPI-бекенд, PostgreSQL и Redis, RabbitMQ для очередей, Next.js фронтенд."
+      }
+    ],
+    "scope_id": "mqtest-edge_long_technical_with_pref-caa8ed00",
+    "session_id": "mqsess-edge_long_technical_with_pref-caa8ed00",
+    "self_check": "OK"
+  },
+  "edge_forget_vim": {
+    "scenario_id": "edge_forget_vim",
+    "category": "edge",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "vs code",
+      "vscode"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Забудь что я использую Vim, я перешёл на VS Code"
+      }
+    ],
+    "description": "Просьба забыть старое и запомнить новое",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_editor.md",
+        "content": "---\nname: User editor preference update\ndescription: Memorizing the user's transition to VS Code.\ntype: user\n---\nPreviously used Vim, switched to VS Code."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_editor.md",
+        "content": "---\nname: User editor preference update\ndescription: Memorizing the user's transition to VS Code.\ntype: user\n---\nPreviously used Vim, switched to VS Code."
+      }
+    ],
+    "scope_id": "mqtest-edge_forget_vim-04a9ffb7",
+    "session_id": "mqsess-edge_forget_vim-04a9ffb7",
+    "self_check": "OK"
+  },
+  "neg_for_loop": {
+    "scenario_id": "neg_for_loop",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Как написать цикл for в Python?"
+      }
+    ],
+    "description": "Обычный вопрос о синтаксисе",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_for_loop-d7b7bb46",
+    "session_id": "mqsess-neg_for_loop-d7b7bb46",
+    "self_check": "OK"
+  },
+  "edge_ambiguous_fact": {
+    "scenario_id": "edge_ambiguous_fact",
+    "category": "edge",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Python — хороший язык"
+      }
+    ],
+    "description": "Неоднозначная формулировка — факт, не предпочтение",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_language_preferences.md",
+        "content": "---\nname: Python preference\ndescription: The user expressed positive sentiment towards Python\n\nThe user has expressed appreciation for Python, indicating a familiarity and preference for the language.\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_language_preferences.md",
+        "content": "---\nname: Python preference\ndescription: The user expressed positive sentiment towards Python\n\nThe user has expressed appreciation for Python, indicating a familiarity and preference for the language.\n"
+      }
+    ],
+    "scope_id": "mqtest-edge_ambiguous_fact-e308bd9e",
+    "session_id": "mqsess-edge_ambiguous_fact-e308bd9e",
+    "self_check": "WARN: expected no save but files appeared"
+  },
+  "neg_greeting": {
+    "scenario_id": "neg_greeting",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Привет, как дела?"
+      }
+    ],
+    "description": "Обычное приветствие",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_greeting-65c71e77",
+    "session_id": "mqsess-neg_greeting-65c71e77",
+    "self_check": "OK"
+  },
+  "neg_thanks": {
+    "scenario_id": "neg_thanks",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Спасибо за помощь!"
+      }
+    ],
+    "description": "Благодарность",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_thanks-d5f27b80",
+    "session_id": "mqsess-neg_thanks-d5f27b80",
+    "self_check": "OK"
+  },
+  "edge_contradiction": {
+    "scenario_id": "edge_contradiction",
+    "category": "edge",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "rust"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я люблю Python"
+      },
+      {
+        "role": "assistant",
+        "content": "Хорошо, я запомню что вы предпочитаете Python."
+      },
+      {
+        "role": "user",
+        "content": "На самом деле я больше люблю Rust"
+      }
+    ],
+    "description": "Противоречие — последнее высказывание важнее",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: Пользовательские предпочтения\ndescription: Об администрировании предпочтений пользователя\nтип: user\n---\n\nПользователь предпочитает Rust Python.\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: Пользовательские предпочтения\ndescription: Об администрировании предпочтений пользователя\nтип: user\n---\n\nПользователь предпочитает Rust Python.\n"
+      }
+    ],
+    "scope_id": "mqtest-edge_contradiction-769aaf28",
+    "session_id": "mqsess-edge_contradiction-769aaf28",
+    "self_check": "OK"
+  },
+  "neg_write_sort": {
+    "scenario_id": "neg_write_sort",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Напиши функцию сортировки"
+      }
+    ],
+    "description": "Обычная кодовая задача",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_write_sort-7cb546e3",
+    "session_id": "mqsess-neg_write_sort-7cb546e3",
+    "self_check": "OK"
+  },
+  "neg_di_explain": {
+    "scenario_id": "neg_di_explain",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Что такое dependency injection?"
+      }
+    ],
+    "description": "Теоретический вопрос",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_di_explain-dc335c48",
+    "session_id": "mqsess-neg_di_explain-dc335c48",
+    "self_check": "OK"
+  },
+  "multi_ru_workplace": {
+    "scenario_id": "multi_ru_workplace",
+    "category": "multilingual",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "мтс",
+      "mts"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Запомни: я работаю в МТС"
+      }
+    ],
+    "description": "Русский: место работы",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_company.md",
+        "content": "---\nname: User Company\ndescription: User's employment and affiliation details\n\n---\nCompany: МТС\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_company.md",
+        "content": "---\nname: User Company\ndescription: User's employment and affiliation details\n\n---\nCompany: МТС\n"
+      }
+    ],
+    "scope_id": "mqtest-multi_ru_workplace-230532df",
+    "session_id": "mqsess-multi_ru_workplace-230532df",
+    "self_check": "OK"
+  },
+  "neg_weather": {
+    "scenario_id": "neg_weather",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "What's the weather like today?"
+      }
+    ],
+    "description": "Off-topic question (en)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_weather-0147d840",
+    "session_id": "mqsess-neg_weather-0147d840",
+    "self_check": "OK"
+  },
+  "multi_en_functional": {
+    "scenario_id": "multi_en_functional",
+    "category": "multilingual",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "functional"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Remember that I prefer functional programming"
+      }
+    ],
+    "description": "English: programming paradigm preference",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: user_preferences\ndescription: User has a preference for functional programming\n type: user\n---\n\nThe user expressed a preference for functional programming."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_preferences.md",
+        "content": "---\nname: user_preferences\ndescription: User has a preference for functional programming\n type: user\n---\n\nThe user expressed a preference for functional programming."
+      }
+    ],
+    "scope_id": "mqtest-multi_en_functional-469aa0c9",
+    "session_id": "mqsess-multi_en_functional-469aa0c9",
+    "self_check": "OK"
+  },
+  "neg_rest_vs_graphql": {
+    "scenario_id": "neg_rest_vs_graphql",
+    "category": "negative",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Объясни разницу между REST и GraphQL"
+      }
+    ],
+    "description": "Технический вопрос без предпочтения",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-neg_rest_vs_graphql-10ec3a74",
+    "session_id": "mqsess-neg_rest_vs_graphql-10ec3a74",
+    "self_check": "OK"
+  },
+  "edge_conditional_pref": {
+    "scenario_id": "edge_conditional_pref",
+    "category": "edge",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "go",
+      "python"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Для бекенда я использую Go, а для скриптов — Python"
+      }
+    ],
+    "description": "Условные предпочтения (разные инструменты для разных задач)",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: Backend_Preferences\ndescription: User prefers Go for backend and Python for scripts\ntype: user\n---\nThe user indicated a preference for Go for backend work and Python for scripting."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user_role.md",
+        "content": "---\nname: Backend_Preferences\ndescription: User prefers Go for backend and Python for scripts\ntype: user\n---\nThe user indicated a preference for Go for backend work and Python for scripting."
+      }
+    ],
+    "scope_id": "mqtest-edge_conditional_pref-38a7d5ca",
+    "session_id": "mqsess-edge_conditional_pref-38a7d5ca",
+    "self_check": "OK"
+  },
+  "multi_mixed_react": {
+    "scenario_id": "multi_mixed_react",
+    "category": "multilingual",
+    "should_save": true,
+    "expected_memory_type": "user",
+    "keywords": [
+      "react",
+      "frontend"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Я люблю использовать React для frontend-а"
+      }
+    ],
+    "description": "Смешанный: React для фронтенда",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "user React preference.md",
+        "content": "---\nname: user React preference\ndescription: User prefers using React for frontend work\n            \ntype: user\n---\n\nUser expressed enjoying using React for frontend development."
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "user React preference.md",
+        "content": "---\nname: user React preference\ndescription: User prefers using React for frontend work\n            \ntype: user\n---\n\nUser expressed enjoying using React for frontend development."
+      }
+    ],
+    "scope_id": "mqtest-multi_mixed_react-b3059f40",
+    "session_id": "mqsess-multi_mixed_react-b3059f40",
+    "self_check": "OK"
+  },
+  "multi_mixed_tech_stack": {
+    "scenario_id": "multi_mixed_tech_stack",
+    "category": "multilingual",
+    "should_save": true,
+    "expected_memory_type": "project",
+    "keywords": [
+      "next.js",
+      "tailwind",
+      "prisma"
+    ],
+    "messages": [
+      {
+        "role": "user",
+        "content": "Мы используем Next.js, TailwindCSS и Prisma в нашем проекте"
+      }
+    ],
+    "description": "Смешанный: технологический стек",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [
+      {
+        "filename": "project_technologies.md",
+        "content": "---\nname: Project Technologies\ndescription: technologies used in the project\n累ype: project\n---\nNext.js, TailwindCSS and Prisma are being used in the project.\n"
+      }
+    ],
+    "all_memories": [
+      {
+        "filename": "project_technologies.md",
+        "content": "---\nname: Project Technologies\ndescription: technologies used in the project\n累ype: project\n---\nNext.js, TailwindCSS and Prisma are being used in the project.\n"
+      }
+    ],
+    "scope_id": "mqtest-multi_mixed_tech_stack-ab3e564f",
+    "session_id": "mqsess-multi_mixed_tech_stack-ab3e564f",
+    "self_check": "OK"
+  },
+  "edge_sarcasm": {
+    "scenario_id": "edge_sarcasm",
+    "category": "edge",
+    "should_save": false,
+    "expected_memory_type": null,
+    "keywords": [],
+    "messages": [
+      {
+        "role": "user",
+        "content": "О да, я просто обожаю писать на Java (сарказм)"
+      }
+    ],
+    "description": "Саркастическое высказывание — не должно сохраняться как предпочтение",
+    "api_ok": true,
+    "api_error": null,
+    "saved_files": [],
+    "all_memories": [],
+    "scope_id": "mqtest-edge_sarcasm-0099b5e7",
+    "session_id": "mqsess-edge_sarcasm-0099b5e7",
+    "self_check": "OK"
+  }
+}
