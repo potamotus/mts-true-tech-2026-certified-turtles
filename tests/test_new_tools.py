@@ -14,6 +14,7 @@ def test_new_primitives_registered():
     assert "generate_image" in names
     assert "generate_presentation" in names
     assert "read_workspace_file" in names
+    assert "transcribe_workspace_audio" in names
     assert "execute_python" in names
     assert "google_docs_read" in names
     assert "google_docs_append" in names
@@ -27,6 +28,7 @@ def test_parent_tools_expose_all():
         "generate_image",
         "generate_presentation",
         "read_workspace_file",
+        "transcribe_workspace_audio",
         "execute_python",
         "google_docs_read",
         "google_docs_append",
@@ -194,6 +196,26 @@ def test_web_search_refuses_url_query():
     out = run_primitive_tool("web_search", {"query": "https://example.com"})
     data = json.loads(out)
     assert data.get("error") == "bad_query"
+
+
+def test_web_search_returns_structured_json(monkeypatch):
+    """Успешная выдача — JSON с results и summary (удобно парсить и читать)."""
+    import certified_turtles.tools.builtins.web_search as ws_builtin
+
+    monkeypatch.setattr(
+        ws_builtin,
+        "duckduckgo_text_search",
+        lambda q, max_results=5: [
+            {"title": "T", "href": "https://a.example", "body": "snippet"},
+        ],
+    )
+    out = run_primitive_tool("web_search", {"query": "test query", "max_results": 3})
+    data = json.loads(out)
+    assert data.get("query") == "test query"
+    assert data.get("count") == 1
+    assert len(data.get("results") or []) == 1
+    assert "summary" in data
+    assert "T" in data["summary"]
 
 
 def test_execute_python_allows_urllib_and_http_client(monkeypatch, tmp_path):

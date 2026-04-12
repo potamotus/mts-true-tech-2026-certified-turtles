@@ -23,6 +23,14 @@ def test_normalize_image_url_preserved_in_list():
     assert out[-1]["type"] == "image_url"
 
 
+def test_normalize_input_image_maps_to_image_url():
+    content = [{"type": "input_image", "input_image": {"url": "https://example.com/z.jpg"}}]
+    out = normalize_message_content(content)
+    assert isinstance(out, list)
+    assert out[0]["type"] == "image_url"
+    assert "example.com" in out[0]["image_url"]["url"]
+
+
 def test_normalize_chat_messages():
     msgs = [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
     out = normalize_chat_messages(msgs)
@@ -62,6 +70,31 @@ def test_file_attachment_raw_base64_saved(uploads_tmp):
     out = normalize_message_content(content)
     assert isinstance(out, str)
     assert "file_id:" in out
+
+
+def test_audio_attachment_saved_and_hints_transcribe_tool(uploads_tmp):
+    raw = b"RIFF" + b"\x00" * 32
+    b64 = base64.b64encode(raw).decode()
+    content = [
+        {"type": "file", "filename": "note.mp3", "mime_type": "audio/mpeg", "file": {"data": f"data:audio/mpeg;base64,{b64}"}},
+    ]
+    out = normalize_message_content(content)
+    assert isinstance(out, str)
+    assert "file_id:" in out
+    assert "transcribe_workspace_audio" in out
+    saved = list(uploads_tmp.iterdir())
+    assert len(saved) == 1
+    assert saved[0].suffix == ".mp3"
+
+
+def test_input_audio_decoded_as_file(uploads_tmp):
+    raw = b"fake-wav-bytes-" + b"\x00" * 32
+    b64 = base64.b64encode(raw).decode()
+    content = [{"type": "input_audio", "input_audio": {"data": b64, "format": "wav"}}]
+    out = normalize_message_content(content)
+    assert isinstance(out, str)
+    assert "file_id:" in out
+    assert "transcribe_workspace_audio" in out
 
 
 def test_open_webui_rag_source_hydrated(uploads_tmp):

@@ -13,6 +13,12 @@ _DEFAULT_MODEL = "flux"
 _ALLOWED_MODELS = frozenset({"flux", "turbo"})
 _MIN_SIDE = 256
 _MAX_SIDE = 1536
+_MAX_PROMPT_CHARS = 2000
+
+
+def _safe_markdown_alt(s: str) -> str:
+    """Квадратные скобки ломают ![alt](url) — убираем."""
+    return (s or "").replace("[", "(").replace("]", ")").replace("\n", " ").strip()[:500] or "image"
 
 
 def _clamp_side(raw: Any, default: int) -> int:
@@ -27,25 +33,35 @@ def _handle_generate_image(arguments: dict[str, Any]) -> str:
     prompt = arguments.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         return json.dumps({"error": "Нужен непустой строковый параметр prompt."}, ensure_ascii=False)
+    prompt_clean = prompt.strip()
+    if len(prompt_clean) > _MAX_PROMPT_CHARS:
+        return json.dumps(
+            {
+                "error": "prompt_too_long",
+                "detail": f"Максимум {_MAX_PROMPT_CHARS} символов; сократи описание.",
+            },
+            ensure_ascii=False,
+        )
     width = _clamp_side(arguments.get("width", 1024), 1024)
     height = _clamp_side(arguments.get("height", 1024), 1024)
     model = arguments.get("model") or _DEFAULT_MODEL
     if model not in _ALLOWED_MODELS:
         model = _DEFAULT_MODEL
 
-    encoded_prompt = urllib.parse.quote(prompt.strip(), safe="")
+    encoded_prompt = urllib.parse.quote(prompt_clean, safe="")
     query = urllib.parse.urlencode(
         {"width": width, "height": height, "model": model, "nologo": "true"}
     )
     url = f"{_POLLINATIONS_BASE}/{encoded_prompt}?{query}"
+    alt = _safe_markdown_alt(prompt_clean)
     return json.dumps(
         {
             "url": url,
             "width": width,
             "height": height,
             "model": model,
-            "prompt": prompt.strip(),
-            "markdown": f"![{prompt.strip()}]({url})",
+            "prompt": prompt_clean,
+            "markdown": f"![{alt}]({url})",
             "hint": "Вставь `markdown` как есть в итоговый ответ — Open WebUI отрендерит картинку инлайн.",
         },
         ensure_ascii=False,

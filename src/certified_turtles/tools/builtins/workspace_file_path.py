@@ -59,11 +59,16 @@ def _handle_workspace_file_path(arguments: dict[str, Any]) -> str:
             return json.dumps({"error": "Некорректный file_id."}, ensure_ascii=False)
         return json.dumps({"error": "Файл не найден. Сначала загрузите через POST /api/v1/uploads."}, ensure_ascii=False)
     name, path = resolved
+    try:
+        size_b = path.stat().st_size
+    except OSError:
+        size_b = None
     return json.dumps(
         {
             "file_id": name,
             "absolute_path": str(path.resolve()),
             "suffix": path.suffix.lower(),
+            "size_bytes": size_b,
             "hint": (
                 "В execute_python передай тот же file_id во второй аргумент `file_id` тула или вставь absolute_path в pd.read_csv(path). "
                 "Не вызывай workspace_file_path() внутри Python — это отдельный тул."

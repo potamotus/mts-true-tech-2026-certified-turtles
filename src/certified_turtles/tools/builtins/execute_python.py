@@ -348,6 +348,10 @@ register_tool(
                         "тогда в коде доступна строка CT_DATA_FILE_ABSPATH."
                     ),
                 },
+                "file_id_2": {
+                    "type": "string",
+                    "description": "Необязательно: второй загруженный файл; константа CT_DATA_FILE_ABSPATH_2.",
+                },
             },
             "required": ["code"],
         },

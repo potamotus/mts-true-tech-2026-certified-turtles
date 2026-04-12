@@ -39,7 +39,17 @@ services:
     restart: unless-stopped
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.8.5
+    # Сборка из форка: переключатель Deep Research (ct_mode) в UI чата.
+    build:
+      context: ./open-webui-fork
+      dockerfile: Dockerfile
+      args:
+        # Стабильный кеш: одно и то же значение при `docker compose build` без лишних --build-arg.
+        # Переопределение: NODE_HEAP_MB=4096 в .env или docker compose build --build-arg NODE_HEAP_MB=4096
+        NODE_HEAP_MB: ${NODE_HEAP_MB:-6144}
+        # Не качает sentence-transformers/whisper в слое pip при сборке — меньше диска и времени (RAG при первом use).
+        USE_SLIM: "${OPEN_WEBUI_USE_SLIM:-true}"
+    image: certified-turtles-open-webui:local
     container_name: open-webui
     depends_on:
       - api
@@ -56,9 +66,12 @@ services:
       ENABLE_OPENAI_API: "True"
       OPENAI_API_KEY: ${MWS_API_KEY:-}
       # Агент (тулы): http://api:8000/v1 — второе подключение «просто чат»: http://api:8000/v1/plain (см. README).
+      # Deep Research без раздувания списка моделей: второе подключение Open WebUI с
+      # OPENAI_API_BASE_URL: http://api:8000/v1/m/deep_research (см. prompts/openwebui_modes.md).
       OPENAI_API_BASE_URL: http://api:8000/v1
-      # Голос и live-режим (Call): STT/TTS через Web Speech API в браузере — без серверных моделей.
-      # MWS не даёт audio-эндпоинтов, поэтому используем встроенный движок браузера.
+      # Голос: по умолчанию Web Speech API в браузере. Серверный ASR — тот же API base + /v1/audio/transcriptions (прокси на MWS):
+      #   AUDIO_STT_ENGINE: "openai"
+      # Модель Whisper: CT_ASR_MODEL в сервисе api (по умолчанию whisper-1).
       AUDIO_STT_ENGINE: "web"
       AUDIO_TTS_ENGINE: "web"
       ENABLE_AUDIO_CONVERSATION: "True"

@@ -60,9 +60,16 @@ def fetch_url_text(url: str, *, max_chars: int = 8000, timeout: int = 15) -> dic
     req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
+            ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             charset = resp.headers.get_content_charset() or "utf-8"
-            raw = resp.read().decode(charset, errors="replace")
+            raw_bytes = resp.read()
             final_url = resp.geturl()
+            if ctype.startswith("text/plain"):
+                text = raw_bytes.decode(charset, errors="replace").strip()
+                if len(text) > max_chars:
+                    text = text[:max_chars] + "…"
+                return {"url": final_url, "title": "", "text": text}
+            raw = raw_bytes.decode(charset, errors="replace")
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code} при загрузке {url}") from e
     except urllib.error.URLError as e:

@@ -84,7 +84,7 @@ def test_single_system_after_merge_and_tool_round_after_repair(monkeypatch, tmp_
     assert len(system_roles) == 1
     s0 = system_roles[0]["content"]
     assert isinstance(s0, str)
-    assert "ПРИОРИТЕТ ФОРМАТА" in s0
+    assert "Приоритет над вторичными" in s0
     assert "Контекст и инструкции чата" in s0
     assert "file_id=" in s0 or "[CT: RAG-источник" in s0
 

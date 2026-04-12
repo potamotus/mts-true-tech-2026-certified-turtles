@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 _agent_log = agent_logger("loop")
 
 # Open WebUI кладёт RAG вторым system («ответь пользователю текстом») — ломает JSON-протокол.
-_SYSTEM_FORMAT_OVERRIDE = load_prompt("system_format_override.md").strip()
+_SYSTEM_FORMAT_OVERRIDE = (
+    load_prompt("system_format_override.md").strip() + "\n\n" + load_prompt("style_openwebui.md").strip()
+)
 
 
 def _last_chat_user_plain_text(work: list[dict[str, Any]]) -> str:

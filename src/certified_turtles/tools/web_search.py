@@ -42,7 +42,7 @@ def duckduckgo_text_search(query: str, *, max_results: int = 5) -> list[dict[str
 
 def format_search_results_for_llm(items: list[dict[str, Any]]) -> str:
     if not items:
-        return "Поиск не дал результатов. Сформулируй запрос иначе или скажи пользователю, что данных нет."
+        return "Поиск не дал результатов. Сформулируй запрос иначе, уточни язык/год или скажи пользователю, что выдачи нет."
     lines: list[str] = []
     for i, it in enumerate(items, 1):
         title = it.get("title") or "(без заголовка)"

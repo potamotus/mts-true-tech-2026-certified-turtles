@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 _MAX_SLIDES = 25
 _MAX_BULLETS = 10
+_MAX_TITLE_LEN = 200
+_MAX_SUBTITLE_LEN = 300
 _SLIDE_KINDS: frozenset[str] = frozenset({"content", "section", "thanks", "image"})
 
 
@@ -98,8 +100,12 @@ def _handle_generate_presentation(arguments: dict[str, Any]) -> str:
     title = arguments.get("title")
     if not isinstance(title, str) or not title.strip():
         return json.dumps({"error": "Нужен непустой title."}, ensure_ascii=False)
+    if len(title.strip()) > _MAX_TITLE_LEN:
+        return json.dumps({"error": f"title слишком длинный (макс {_MAX_TITLE_LEN} символов)."}, ensure_ascii=False)
     subtitle_raw = arguments.get("subtitle") or ""
     subtitle = subtitle_raw if isinstance(subtitle_raw, str) else ""
+    if len(subtitle) > _MAX_SUBTITLE_LEN:
+        return json.dumps({"error": f"subtitle слишком длинный (макс {_MAX_SUBTITLE_LEN})."}, ensure_ascii=False)
 
     slides_raw = arguments.get("slides")
     if not isinstance(slides_raw, list) or not slides_raw:

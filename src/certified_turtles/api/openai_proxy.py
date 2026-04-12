@@ -6,7 +6,7 @@ import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from certified_turtles.agents.json_agent_protocol import (
@@ -16,6 +16,12 @@ from certified_turtles.agents.json_agent_protocol import (
 )
 from certified_turtles.agent_debug_log import agent_logger, debug_clip, summarize_messages
 from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
+from certified_turtles.chat_modes import prepare_chat_request, resolve_mode_path_segment
+from certified_turtles.model_mode import (
+    apply_virtual_model_to_body,
+    merge_virtual_models_openai_payload,
+    should_merge_virtual_models_into_list,
+)
 from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
 
 router = APIRouter(tags=["openai-proxy"])
@@ -31,6 +37,7 @@ _PASS_THROUGH_IGNORE = {
     "use_agent",
     "ct_use_agent",
     "agent_mode",
+    "ct_mode",
 }
 
 
@@ -46,7 +53,10 @@ async def list_models() -> Any:
     svc = _service()
     try:
         # list_models ходит в MWS по сети — не блокируем event loop (параллель с /v1/chat/completions).
-        return await asyncio.to_thread(svc.list_models)
+        raw = await asyncio.to_thread(svc.list_models)
+        if should_merge_virtual_models_into_list():
+            return merge_virtual_models_openai_payload(raw)
+        return raw
     except MWSGPTError as e:
         raise HTTPException(
             status_code=http_status_for_mws_error(e),
@@ -58,6 +68,82 @@ async def list_models() -> Any:
 async def list_models_plain_prefix() -> Any:
     """Тот же /v1/models, если в Open WebUI заведено отдельное подключение с base …/v1/plain."""
     return await list_models()
+
+
+@router.get("/v1/m/{mode}/models")
+async def list_models_for_mode(mode: str) -> Any:
+    """Список моделей MWS без размножения; режим задаётся URL подключения (см. POST …/v1/m/{mode}/chat/completions)."""
+    try:
+        resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    svc = _service()
+    try:
+        return await asyncio.to_thread(svc.list_models)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.get("/v1/m/{mode}/plain/models")
+async def list_models_for_mode_plain(mode: str) -> Any:
+    """То же для base …/v1/m/{mode}/plain."""
+    return await list_models_for_mode(mode)
+
+
+async def _audio_transcriptions_impl(
+    file: UploadFile,
+    model: str | None,
+    language: str | None,
+    prompt: str | None,
+    response_format: str | None,
+) -> Any:
+    svc = _service()
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    fn = file.filename or "audio.bin"
+    try:
+        return await asyncio.to_thread(
+            svc.client.audio_transcriptions,
+            raw,
+            fn,
+            model=model,
+            language=language,
+            prompt=prompt,
+            response_format=response_format,
+        )
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.post("/v1/audio/transcriptions")
+async def audio_transcriptions(
+    file: UploadFile = File(...),
+    model: str | None = Form(None),
+    language: str | None = Form(None),
+    prompt: str | None = Form(None),
+    response_format: str | None = Form(None),
+) -> Any:
+    """OpenAI-совместимый ASR: прокси на MWS. В Open WebUI: AUDIO_STT_ENGINE=openai и тот же API base."""
+    return await _audio_transcriptions_impl(file, model, language, prompt, response_format)
+
+
+@router.post("/v1/plain/audio/transcriptions")
+async def audio_transcriptions_plain_prefix(
+    file: UploadFile = File(...),
+    model: str | None = Form(None),
+    language: str | None = Form(None),
+    prompt: str | None = Form(None),
+    response_format: str | None = Form(None),
+) -> Any:
+    """Тот же ASR при base URL …/v1/plain."""
+    return await _audio_transcriptions_impl(file, model, language, prompt, response_format)
 
 
 def _completion_with_visible_markdown(completion: dict[str, Any]) -> dict[str, Any]:
@@ -194,6 +280,16 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
     plain = force_plain or _wants_plain_chat(body) or ow_meta_plain or ow_tool_router_plain
+    if plain:
+        prepared = prepare_chat_request(body, messages, for_agent=False)
+        messages = prepared.messages
+    else:
+        prepared = prepare_chat_request(body, messages, for_agent=True)
+        messages = prepared.messages
+        if prepared.max_tool_rounds_override is not None:
+            max_tool_rounds = max(max_tool_rounds, prepared.max_tool_rounds_override)
+        if prepared.mode_applied:
+            _proxy_log.debug("ct_mode applied=%s max_tool_rounds=%s", prepared.mode_applied, max_tool_rounds)
     if ow_meta_plain and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui auxiliary ### Task -> plain chat (no agent JSON protocol)")
     if ow_tool_router_plain and not force_plain and not _wants_plain_chat(body):
@@ -245,6 +341,7 @@ async def chat_completions(request: Request) -> Any:
         raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    apply_virtual_model_to_body(body)
     return await _chat_completions_from_body(body, force_plain=False)
 
 
@@ -257,4 +354,41 @@ async def chat_completions_plain(request: Request) -> Any:
         raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    apply_virtual_model_to_body(body)
+    return await _chat_completions_from_body(body, force_plain=True)
+
+
+@router.post("/v1/m/{mode}/chat/completions")
+async def chat_completions_with_mode(mode: str, request: Request) -> Any:
+    """Режим из пути URL (отдельное подключение Open WebUI: base …/v1/m/deep_research) — без длинного списка моделей."""
+    try:
+        mode_id = resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    body["ct_mode"] = mode_id
+    apply_virtual_model_to_body(body)
+    return await _chat_completions_from_body(body, force_plain=False)
+
+
+@router.post("/v1/m/{mode}/plain/chat/completions")
+async def chat_completions_with_mode_plain(mode: str, request: Request) -> Any:
+    """Режим из пути + plain-чат (base …/v1/m/{mode}/plain)."""
+    try:
+        mode_id = resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    body["ct_mode"] = mode_id
+    apply_virtual_model_to_body(body)
     return await _chat_completions_from_body(body, force_plain=True)
