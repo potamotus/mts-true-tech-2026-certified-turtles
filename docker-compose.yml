@@ -21,13 +21,16 @@ services:
       - path: .env
         required: false
     environment:
+      # Потоковый вывод Python в логах Docker (иначе буфер до конца запроса).
+      PYTHONUNBUFFERED: "1"
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
       GENERATED_FILES_DIR: /data/generated
       UPLOADS_DIR: /data/generated/uploads
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
-      # Подробный трейс агента на stderr контейнера: [agent-debug] … (uvicorn остаётся --log-level error).
-      CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-}
+      # Подробный трейс агента на stderr: [agent-debug] … Смотреть: docker compose logs -f api
+      # Выключить шум: CT_AGENT_DEBUG=0 в .env
+      CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-1}
       CT_AGENT_DEBUG_MAX_CHARS: ${CT_AGENT_DEBUG_MAX_CHARS:-}
       # Google Docs: JSON service account + расшарить документ на client_email из ключа.
       # Раскомментируйте обе строки и положите ключ на хост, либо задайте абсолютный путь к файлу на хосте.

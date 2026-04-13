@@ -34,7 +34,15 @@ def configure_agent_debug_from_env() -> None:
 
     if enabled:
         parent.setLevel(logging.DEBUG)
-        h = logging.StreamHandler(sys.stderr)
+
+        class _FlushStreamHandler(logging.StreamHandler):
+            """Чтобы строки сразу попадали в `docker compose logs -f`, без буфера до конца запроса."""
+
+            def emit(self, record: logging.LogRecord) -> None:
+                super().emit(record)
+                self.flush()
+
+        h = _FlushStreamHandler(sys.stderr)
         h.setLevel(logging.DEBUG)
         h.setFormatter(logging.Formatter("[agent-debug] %(levelname)s %(name)s: %(message)s"))
         parent.addHandler(h)

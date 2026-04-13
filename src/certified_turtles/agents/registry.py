@@ -48,8 +48,8 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
         id=DEEP_RESEARCH_AGENT_ID,
         system_prompt=load_prompt("subagents/deep_research.md").strip(),
         tool_names=("web_search", "fetch_url"),
-        max_inner_rounds=16,
-        blurb="Многошаговое исследование с fetch_url и markdown-отчётом.",
+        max_inner_rounds=24,
+        blurb="Многошаговое исследование: много поисков, fetch_url, валидация, подробный отчёт.",
     ),
     CODER_AGENT_ID: SubAgentSpec(
         id=CODER_AGENT_ID,
