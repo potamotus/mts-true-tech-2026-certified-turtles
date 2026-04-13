@@ -48,12 +48,29 @@ def _service() -> LLMService:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
+def _inject_auto_model(payload: dict[str, Any]) -> dict[str, Any]:
+    """Добавляет виртуальную модель 'auto' в начало списка моделей."""
+    auto_model = {
+        "id": "auto",
+        "object": "model",
+        "created": int(time.time()),
+        "owned_by": "certified-turtles",
+    }
+    data = payload.get("data", [])
+    # Добавляем auto первой, если её ещё нет
+    if not any(m.get("id") == "auto" for m in data):
+        payload = dict(payload)
+        payload["data"] = [auto_model] + list(data)
+    return payload
+
+
 @router.get("/v1/models")
 async def list_models() -> Any:
     svc = _service()
     try:
         # list_models ходит в MWS по сети — не блокируем event loop (параллель с /v1/chat/completions).
         raw = await asyncio.to_thread(svc.list_models)
+        raw = _inject_auto_model(raw)
         if should_merge_virtual_models_into_list():
             return merge_virtual_models_openai_payload(raw)
         return raw
