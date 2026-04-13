@@ -136,8 +136,8 @@
 												<div class="line-clamp-1 font-medium text-gray-800 dark:text-gray-200">
 													{memory.name || memory.content}
 												</div>
-												{#if memory.description && memory.description !== memory.name}
-													<div class="line-clamp-1 text-xs text-gray-500">{memory.description}</div>
+												{#if memory.content}
+													<div class="line-clamp-1 text-xs text-gray-500">{memory.content}</div>
 												{/if}
 											</div>
 										</td>

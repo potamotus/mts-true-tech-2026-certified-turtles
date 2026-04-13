@@ -21,6 +21,8 @@ from certified_turtles.api.files import router as files_router
 from certified_turtles.api.memory import router as memory_router
 from certified_turtles.api.openai_proxy import router as openai_proxy_router
 from certified_turtles.api.uploads import router as uploads_router
+from certified_turtles.api.agent_config import router as agent_config_router
+from certified_turtles.api.mws_tables_config import router as mws_tables_router
 
 _backend = get_backend_logger()
 
@@ -151,6 +153,8 @@ app.include_router(files_router)
 app.include_router(agent_router, prefix="/api/v1")
 app.include_router(uploads_router, prefix="/api/v1")
 app.include_router(memory_router, prefix="/api/v1")
+app.include_router(mws_tables_router, prefix="/api/v1")
+app.include_router(agent_config_router, prefix="/api/v1")
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"

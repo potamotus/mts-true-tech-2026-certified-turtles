@@ -18,7 +18,8 @@ from certified_turtles.agents.json_agent_protocol import (
 from certified_turtles.agent_debug_log import agent_logger, debug_clip, summarize_messages
 from certified_turtles.memory_runtime import RequestContext, runtime_from_env
 from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
-from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
+from certified_turtles.api.agent_config import get_max_agent_tokens
+from certified_turtles.services.llm import LLMService
 
 router = APIRouter(tags=["openai-proxy"])
 _proxy_log = agent_logger("openai_proxy")
@@ -27,7 +28,7 @@ _PASS_THROUGH_IGNORE = {
     "model",
     "messages",
     "stream",
-    "max_tool_rounds",
+    "max_agent_tokens",
     "tools",
     "tool_choice",
     "use_agent",
@@ -140,7 +141,7 @@ def _sse_stream(model: str, completion: dict[str, Any]):
     yield "data: [DONE]\n\n"
 
 
-async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, prepared_messages, extra):
+async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, prepared_messages, extra, *, skip_after_response: bool = False):
     """True upstream SSE for plain mode: pipe chunks, collect content for after_response."""
     import queue as _queue
 
@@ -180,13 +181,14 @@ async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_
 
     full_content = "".join(accumulated)
     final_messages = [*prepared_messages, {"role": "assistant", "content": full_content}]
-    try:
-        runtime.after_response(
-            svc.client, model=model, prepared_messages=prepared_messages,
-            final_messages=final_messages, session_id=session_id, scope_id=scope_id,
-        )
-    except Exception:
-        pass
+    if not skip_after_response:
+        try:
+            runtime.after_response(
+                svc.client, model=model, prepared_messages=prepared_messages,
+                final_messages=final_messages, session_id=session_id, scope_id=scope_id,
+            )
+        except Exception:
+            pass
 
 
 def _wants_plain_chat(body: dict[str, Any]) -> bool:
@@ -287,7 +289,7 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         raise HTTPException(status_code=400, detail="Поле `messages` обязательно и не должно быть пустым")
 
     stream = bool(body.get("stream"))
-    max_tool_rounds = clamp_agent_tool_rounds(body.get("max_tool_rounds", 10))
+    max_agent_tokens = get_max_agent_tokens()
     extra = {k: v for k, v in body.items() if k not in _PASS_THROUGH_IGNORE}
 
     svc = _service()
@@ -295,6 +297,10 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     contract_mode = _request_contract_mode(body)
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
+    # A request is a real user conversation unless it's a utility/meta task.
+    # Utility tasks (title generation, tool routing, etc.) should not trigger
+    # side-effects like memory extraction — only the main chat request should.
+    is_conversation = not (ow_meta_plain or ow_tool_router_plain or contract_mode in {"router", "meta_task"})
     if contract_mode == "agent":
         plain = bool(force_plain)
     else:
@@ -321,18 +327,18 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     if ow_tool_router_plain and contract_mode is None and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui Available Tools router -> plain chat (no agent JSON protocol)")
     _proxy_log.debug(
-        "chat_completions request model=%s plain=%s stream=%s max_tool_rounds=%s extra_keys=%s\nmessages_in=\n%s",
+        "chat_completions request model=%s plain=%s stream=%s max_agent_tokens=%s extra_keys=%s\nmessages_in=\n%s",
         model,
         plain,
         stream,
-        max_tool_rounds,
+        max_agent_tokens,
         sorted(extra.keys()),
         summarize_messages(prepared_messages, preview=400) if isinstance(prepared_messages, list) else str(type(prepared_messages)),
     )
     # Plain + stream: true upstream SSE (pipe chunks directly from MWS).
     if plain and stream:
         return StreamingResponse(
-            _upstream_sse_stream(svc, model, prepared_messages, runtime, session_id, scope_id, prepared_messages, extra),
+            _upstream_sse_stream(svc, model, prepared_messages, runtime, session_id, scope_id, prepared_messages, extra, skip_after_response=not is_conversation),
             media_type="text/event-stream",
         )
     try:
@@ -350,7 +356,7 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
                 svc.run_agent,
                 model,
                 prepared_messages,
-                max_tool_rounds=max_tool_rounds,
+                max_agent_tokens=max_agent_tokens,
                 request_context=req_ctx,
                 **extra,
             )
@@ -368,14 +374,15 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         "chat_completions response (visible for UI) preview=\n%s",
         debug_clip(_final_assistant_content(completion)),
     )
-    runtime.after_response(
-        svc.client,
-        model=model,
-        prepared_messages=prepared_messages,
-        final_messages=final_messages,
-        session_id=session_id,
-        scope_id=scope_id,
-    )
+    if is_conversation:
+        runtime.after_response(
+            svc.client,
+            model=model,
+            prepared_messages=prepared_messages,
+            final_messages=final_messages,
+            session_id=session_id,
+            scope_id=scope_id,
+        )
     completion = _completion_with_visible_markdown(completion)
     if not stream:
         return completion

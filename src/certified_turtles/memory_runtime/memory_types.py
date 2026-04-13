@@ -26,7 +26,7 @@ TYPES_SECTION: tuple[str, ...] = (
     "    <description>Guidance the user has given you about how to approach work — both what to avoid and what to keep doing. These are a very important type of memory to read and write as they allow you to remain coherent and responsive to the way you should approach work in the project. Record from failure AND success: if you only save corrections, you will avoid past mistakes but drift away from approaches the user has already validated, and may grow overly cautious.</description>",
     "    <when_to_save>Any time the user corrects your approach (\"no not that\", \"don't\", \"stop doing X\") OR confirms a non-obvious approach worked (\"yes exactly\", \"perfect, keep doing that\", accepting an unusual choice without pushback). Corrections are easy to notice; confirmations are quieter — watch for them. In both cases, save what is applicable to future conversations, especially if surprising or not obvious from the code. Include *why* so you can judge edge cases later.</when_to_save>",
     "    <how_to_use>Let these memories guide your behavior so that the user does not need to offer the same guidance twice.</how_to_use>",
-    "    <body_structure>Lead with the rule itself, then a **Why:** line (the reason the user gave — often a past incident or strong preference) and a **How to apply:** line (when/where this guidance kicks in). Knowing *why* lets you judge edge cases instead of blindly following the rule.</body_structure>",
+    "    <body_structure>Lead with the rule itself. If the user gave a reason, add a **Why:** line. If there is a clear scope, add a **How to apply:** line. Only include these if the information was actually provided — do not invent them.</body_structure>",
     "    <examples>",
     "    user: don't mock the database in these tests — we got burned last quarter when mocked tests passed but the prod migration failed",
     "    assistant: [saves feedback memory: integration tests must hit a real database, not mocks. Reason: prior incident where mock/prod divergence masked a broken migration]",
@@ -40,10 +40,10 @@ TYPES_SECTION: tuple[str, ...] = (
     "</type>",
     "<type>",
     "    <name>project</name>",
-    "    <description>Information that you learn about ongoing work, goals, initiatives, bugs, or incidents within the project that is not otherwise derivable from the code or git history. Project memories help you understand the broader context and motivation behind the work the user is doing within this working directory.</description>",
-    '    <when_to_save>When you learn who is doing what, why, or by when. These states change relatively quickly so try to keep your understanding of this up to date. Always convert relative dates in user messages to absolute dates when saving (e.g., "Thursday" → "2026-03-05"), so the memory remains interpretable after time passes.</when_to_save>',
+    "    <description>Decisions, goals, deadlines, and team roles within the project that are NOT derivable from code or git history. Project memories capture WHY something was decided, WHAT the project aims for, and WHO is responsible — not operational steps like configuring tools, running commands, or completing tasks.</description>",
+    '    <when_to_save>When the user shares a DECISION and its rationale, a GOAL, a DEADLINE or constraint, or TEAM roles/responsibilities. Always convert relative dates to absolute (e.g., "Thursday" → "2026-03-05"). Do NOT save operational steps (configured X, installed Y, connected Z) — those are task execution, not project context.</when_to_save>',
     "    <how_to_use>Use these memories to more fully understand the details and nuance behind the user's request and make better informed suggestions.</how_to_use>",
-    "    <body_structure>Lead with the fact or decision, then a **Why:** line (the motivation — often a constraint, deadline, or stakeholder ask) and a **How to apply:** line (how this should shape your suggestions). Project memories decay fast, so the why helps future-you judge whether the memory is still load-bearing.</body_structure>",
+    "    <body_structure>Lead with the fact or decision. If the motivation was stated, add a **Why:** line. If there is a clear implication, add a **How to apply:** line. Only include these if the information was actually provided — do not invent them.</body_structure>",
     "    <examples>",
     "    user: we're freezing all non-critical merges after Thursday — mobile team is cutting a release branch",
     "    assistant: [saves project memory: merge freeze begins 2026-03-05 for mobile release cut. Flag any non-critical PR work scheduled after that date]",
@@ -55,7 +55,7 @@ TYPES_SECTION: tuple[str, ...] = (
     "<type>",
     "    <name>reference</name>",
     "    <description>Stores pointers to where information can be found in external systems. These memories allow you to remember where to look to find up-to-date information outside of the project directory.</description>",
-    "    <when_to_save>When you learn about resources in external systems and their purpose. For example, that bugs are tracked in a specific project in Linear or that feedback can be found in a specific Slack channel.</when_to_save>",
+    "    <when_to_save>When you learn about resources in external systems and their purpose. For example, that bugs are tracked in a specific project in Linear or that feedback can be found in a specific Slack channel. Do NOT save knowledge that is ONLY needed to complete the agent's current task.</when_to_save>",
     "    <how_to_use>When the user references an external system or information that may be in an external system.</how_to_use>",
     "    <examples>",
     '    user: check the Linear project "INGEST" if you want context on these tickets, that\'s where we track all pipeline bugs',
@@ -139,12 +139,12 @@ def build_searching_past_context_section(memory_dir: str) -> tuple[str, ...]:
 MEMORY_FRONTMATTER_EXAMPLE: tuple[str, ...] = (
     "```markdown",
     "---",
-    "name: {{memory name}}",
+    "name: {{human-readable title, e.g. 'Food Preferences', 'Merge Freeze March 2026'}}",
     "description: {{one-line description — used to decide relevance in future conversations, so be specific}}",
     "type: {{user, feedback, project, reference}}",
     "---",
     "",
-    "{{memory content — for feedback/project types, structure as: rule/fact, then **Why:** and **How to apply:** lines}}",
+    "{{memory content — write only what was actually said, do not invent details}}",
     "```",
 )
 
@@ -160,9 +160,20 @@ def memory_instructions(
     *,
     include_index_rules: bool = True,
     skip_index: bool = False,
+    for_main_agent: bool = False,
 ) -> str:
     """Build the memory behavioral instructions matching Claude Code's buildMemoryLines() 1:1."""
-    if skip_index:
+    if for_main_agent:
+        how_to_save = [
+            "## Memory management",
+            "",
+            "Your memory is managed by an automatic background system. You do NOT save memories yourself.",
+            "",
+            "CRITICAL: NEVER mention memory, saving, or remembering in your responses unless the user explicitly asks about it.",
+            "- Do NOT respond as if the user is giving you information to store. Just have a natural conversation.",
+            "- If the user explicitly asks to remember/forget something, acknowledge briefly (one short phrase) and move on.",
+        ]
+    elif skip_index:
         how_to_save = [
             "## How to save memories",
             "",
@@ -194,26 +205,44 @@ def memory_instructions(
             "- Do not write duplicate memories. First check if there is an existing memory you can update before writing a new one.",
         ]
 
-    lines = [
-        "# auto memory",
-        "",
-        f"You have a persistent, file-based memory system at `{memory_dir}`. {DIR_EXISTS_GUIDANCE}" if memory_dir else f"You have a persistent, file-based memory system. {DIR_EXISTS_GUIDANCE}",
-        "",
-        "You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.",
-        "",
-        "If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
-        "",
-        *TYPES_SECTION,
-        *WHAT_NOT_TO_SAVE_SECTION,
-        "",
-        *how_to_save,
-        "",
-        *WHEN_TO_ACCESS_SECTION,
-        "",
-        *TRUSTING_RECALL_SECTION,
-        "",
-        *MEMORY_PERSISTENCE_SECTION,
-        "",
-        *build_searching_past_context_section(memory_dir),
-    ]
+    if for_main_agent:
+        # Main agent: include type descriptions for interpreting recalled memories,
+        # but no save instructions or examples (those are for the extractor).
+        lines = [
+            "# auto memory",
+            "",
+            f"You have a persistent, file-based memory system at `{memory_dir}`." if memory_dir else "You have a persistent, file-based memory system.",
+            "",
+            *how_to_save,
+            "",
+            *TYPES_SECTION,
+            "",
+            *WHEN_TO_ACCESS_SECTION,
+            "",
+            *TRUSTING_RECALL_SECTION,
+        ]
+    else:
+        lines = [
+            "# auto memory",
+            "",
+            (f"You have a persistent, file-based memory system at `{memory_dir}`." if memory_dir else "You have a persistent, file-based memory system.")
+            + f" {DIR_EXISTS_GUIDANCE}",
+            "",
+            "You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.",
+            "",
+            "If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
+            "",
+            *TYPES_SECTION,
+            *WHAT_NOT_TO_SAVE_SECTION,
+            "",
+            *how_to_save,
+            "",
+            *WHEN_TO_ACCESS_SECTION,
+            "",
+            *TRUSTING_RECALL_SECTION,
+            "",
+            *MEMORY_PERSISTENCE_SECTION,
+            "",
+            *build_searching_past_context_section(memory_dir),
+        ]
     return "\n".join(lines)

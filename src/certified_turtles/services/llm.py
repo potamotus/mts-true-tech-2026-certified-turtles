@@ -12,18 +12,7 @@ from certified_turtles.tools.parent_tools import get_parent_tools
 
 _llm_log = agent_logger("llm")
 
-# Согласовано с `AgentChatRequest.max_tool_rounds` (API) и телом Open WebUI к `/v1/chat/completions`.
-_MAX_AGENT_TOOL_ROUNDS = 40
-_MIN_AGENT_TOOL_ROUNDS = 1
-
-
-def clamp_agent_tool_rounds(value: Any) -> int:
-    """Ограничивает число раундов tool-calling (защита от зависаний и мусора в JSON)."""
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        n = 10
-    return max(_MIN_AGENT_TOOL_ROUNDS, min(_MAX_AGENT_TOOL_ROUNDS, n))
+_DEFAULT_MAX_AGENT_TOKENS = 128_000
 
 
 class LLMService:
@@ -99,17 +88,17 @@ class LLMService:
         model: str,
         messages: list[dict[str, Any]],
         *,
-        max_tool_rounds: int = 10,
+        max_agent_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         request_context: RequestContext | None = None,
         **extra: Any,
     ) -> dict[str, Any]:
         """Полный agent-цикл с тулами (примитивы + под-агенты). Возвращает `messages`, `completion`, метаданные."""
         messages = normalize_chat_messages(messages)
-        rounds = clamp_agent_tool_rounds(max_tool_rounds)
+        budget = max_agent_tokens or _DEFAULT_MAX_AGENT_TOKENS
         _llm_log.debug(
-            "run_agent after normalize max_tool_rounds=%s tools_explicit=%s\n%s",
-            rounds,
+            "run_agent after normalize max_agent_tokens=%s tools_explicit=%s\n%s",
+            budget,
             tools is not None,
             summarize_messages(messages),
         )
@@ -118,7 +107,7 @@ class LLMService:
             model,
             messages,
             tools=tools,
-            max_tool_rounds=rounds,
+            max_agent_tokens=budget,
             request_context=request_context,
             **extra,
         )

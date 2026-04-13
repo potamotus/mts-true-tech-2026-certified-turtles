@@ -175,7 +175,7 @@ def build_memory_prompt(
         active_paths = _extract_file_paths_from_messages(messages)
         for rule in _match_conditional_rules(conditional_rules, active_paths):
             parts.append(f"## Conditional Rule: {rule.path.name}\n{rule.content}")
-    parts.append(memory_instructions(str(mem_root), include_index_rules=True))
+    parts.append(memory_instructions(str(mem_root), include_index_rules=True, for_main_agent=True))
 
     index_path = memory_index_path(scope_id)
     if index_path.is_file():

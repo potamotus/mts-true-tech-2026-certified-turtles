@@ -227,18 +227,6 @@ class ClaudeLikeMemoryRuntime:
             )
         )
         self._note_session_turn(session_id)
-        if self._main_agent_wrote_memory(scope_id, final_messages):
-            if self._should_update_session_memory(session_id, final_messages):
-                self._launch_post_hook(
-                    client,
-                    session_id=session_id,
-                    scope_id=scope_id,
-                    agent_id="session_memory",
-                    prompt=self._session_memory_prompt(session_id),
-                )
-                self._mark_session_memory_extracted(session_id, final_messages)
-            self._maybe_launch_auto_dream(client, session_id=session_id, scope_id=scope_id)
-            return
         self._launch_extract_hook(
             client,
             session_id=session_id,
@@ -568,7 +556,10 @@ class ClaudeLikeMemoryRuntime:
             manifest_section = (
                 "\n\n## Existing memory files\n\n"
                 f"{manifest}\n\n"
-                "Check this list before writing — update an existing file rather than creating a duplicate."
+                "IMPORTANT: On your FIRST turn, file_read ALL existing memory files listed above. "
+                "You need their contents to decide whether to update an existing file or create a new one. "
+                "If a new message clarifies, corrects, or adds detail to something already saved — "
+                "UPDATE the existing file instead of creating a duplicate."
             )
 
         # Build how_to_save section (2-step process matching Claude Code)
@@ -599,8 +590,9 @@ class ClaudeLikeMemoryRuntime:
             "and file_edit/file_write for paths inside the memory directory only.",
             "",
             "You have a limited turn budget. file_edit requires a prior file_read of the same file, "
-            "so the efficient strategy is: turn 1 — issue all file_read calls in parallel for every "
-            "file you might update; turn 2 — issue all file_write/file_edit calls in parallel. "
+            "so the efficient strategy is: turn 1 — file_read ALL existing memory files in parallel "
+            "(so you can see what's already saved and correct/update it); "
+            "turn 2 — issue all file_write/file_edit calls in parallel. "
             "Do not interleave reads and writes across multiple turns.",
             "",
             f"You MUST only use content from the last ~{window} messages to update your persistent memories. "
@@ -610,6 +602,35 @@ class ClaudeLikeMemoryRuntime:
             "",
             "If the user explicitly asks you to remember something, save it immediately as whichever type fits best. "
             "If they ask you to forget something, find and remove the relevant entry.",
+            "",
+            "## Decision process",
+            "",
+            "For EACH user message, go through these questions in order:",
+            "1. Does the user ask to remember/forget something? → save/delete immediately",
+            "1b. Does this CONTRADICT, REPLACE, or REFINE something already saved? "
+            "Compare each new fact against every existing memory. If a new statement "
+            "makes an old one false, outdated, or less accurate — the old memory MUST "
+            "be updated or deleted. Do not keep both versions. "
+            "Examples: "
+            "saved 'ходит в зал' (meaning gym), user says 'в концертный зал, слушал Шопена' → UPDATE with precise info; "
+            "saved 'любит пианино', user says 'рок лучше' → DELETE or REPLACE the old preference. "
+            "Rule: when in doubt whether old and new conflict, treat them as conflicting.",
+            "2. Does this reveal WHO the user is? (interests, pets, family, job, skills, location, "
+            "preferences, habits, opinions, likes/dislikes, personal facts) → save as `user`",
+            "3. Does this tell you HOW the user wants you to work? (corrections, praise, style preferences) → save as `feedback`",
+            "4. Does this tell you about a project DECISION, GOAL, DEADLINE, or TEAM role? → save as `project`. "
+            "Operational steps (configured X, installed Y, connected Z) are NOT project context — skip them.",
+            "5. Does this point to an external resource? → save as `reference`",
+            "6. Is it ONLY a command/question with zero personal signal? → skip",
+            "",
+            "IMPORTANT: Do NOT save knowledge that is ONLY needed to complete the agent's current task.",
+            "",
+            "When writing file content: facts only, no meta-commentary or reasoning. "
+            "If a memory relates to other files, add a `## Related` section at the bottom (e.g. `- [project_wikilive_tables.md]`).",
+            "",
+            "Default: SAVE. The cost of saving something unnecessary is near zero (pruned later). "
+            "The cost of missing something is high (lost forever). "
+            "If in doubt between saving and skipping, save.",
             "",
             *TYPES_SECTION,
             *WHAT_NOT_TO_SAVE_SECTION,
@@ -750,24 +771,6 @@ class ClaudeLikeMemoryRuntime:
             if item.get("role") == "user":
                 return message_text_content(item)
         return ""
-
-    def _main_agent_wrote_memory(self, scope_id: str, messages: list[dict[str, Any]]) -> bool:
-        root = str(memory_dir(scope_id))
-        for msg in messages:
-            if msg.get("role") != "assistant":
-                continue
-            parsed = parse_agent_response(message_text_content(msg))
-            if parsed is None:
-                continue
-            for call in parsed.get("calls", []):
-                name = call.get("name")
-                args = call.get("arguments", {})
-                path = ""
-                if isinstance(args, dict):
-                    path = str(args.get("file_path", ""))
-                if name in {"file_write", "file_edit", "memory_write", "memory_edit"} and path.startswith(root):
-                    return True
-        return False
 
     def _estimate_message_tokens(self, messages: list[dict[str, Any]]) -> int:
         total = 0

@@ -6,6 +6,7 @@ services:
     command:
       - uv
       - run
+      - --no-sync
       - uvicorn
       - certified_turtles.main:app
       - --host
@@ -15,6 +16,9 @@ services:
       - --log-level
       - error
       - --no-access-log
+      - --reload
+      - --reload-dir
+      - /app/src
     ports:
       - "8000:8000"
     env_file:
@@ -26,14 +30,20 @@ services:
       GENERATED_FILES_DIR: /data/generated
       UPLOADS_DIR: /data/generated/uploads
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      # Hot-reload: примонтированный ./src должен импортироваться раньше site-packages.
+      PYTHONPATH: /app/src
       # Подробный трейс агента на stderr контейнера: [agent-debug] … (uvicorn остаётся --log-level error).
       CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-}
       CT_AGENT_DEBUG_MAX_CHARS: ${CT_AGENT_DEBUG_MAX_CHARS:-}
+      # MWS Tables (tabs.mts.ru): токен из настроек профиля.
+      MWS_TABLES_API_TOKEN: ${MWS_TABLES_API_TOKEN:-}
+      MWS_TABLES_API_BASE: ${MWS_TABLES_API_BASE:-https://tables.mws.ru/fusion/v1}
       # Google Docs: JSON service account + расшарить документ на client_email из ключа.
       # Раскомментируйте обе строки и положите ключ на хост, либо задайте абсолютный путь к файлу на хосте.
       # GOOGLE_DOCS_CREDENTIALS_JSON: /secrets/google-docs-sa.json
     volumes:
       - generated-files:/data/generated
+      - ./src:/app/src
       # Пример монтирования ключа (рядом с compose: mkdir -p secrets && cp sa.json secrets/google-docs-sa.json):
       # - ./secrets/google-docs-sa.json:/secrets/google-docs-sa.json:ro
     restart: unless-stopped

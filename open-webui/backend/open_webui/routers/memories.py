@@ -36,15 +36,17 @@ class MemoryModel(BaseModel):
 
 def _to_model(item: dict, user_id: str = "default") -> MemoryModel:
     mtime = int(item.get("mtime", time.time()))
+    body = item.get("body", "")
+    content = body or item.get("description", item.get("name", ""))
     return MemoryModel(
         id=item.get("filename", str(uuid.uuid4())),
         user_id=user_id,
-        content=item.get("body", item.get("description", item.get("name", ""))),
+        content=content,
         updated_at=mtime,
         created_at=mtime,
         memory_type=item.get("type", "project"),
         name=item.get("name", ""),
-        description=item.get("description", ""),
+        description=content,
     )
 
 
@@ -94,7 +96,7 @@ async def update_memory_by_id(memory_id: str, request: Request, form_data: Memor
                 existing = r.json()
     except Exception:
         pass
-    payload = {"name": existing.get("name", form_data.content[:80]), "description": existing.get("description", form_data.content[:200]), "type": existing.get("type", "user"), "body": form_data.content}
+    payload = {"name": existing.get("name", form_data.content[:80]), "description": form_data.content[:200], "type": existing.get("type", "user"), "body": form_data.content}
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.put(_ct_url(f"/memory/{memory_id}"), json=payload)

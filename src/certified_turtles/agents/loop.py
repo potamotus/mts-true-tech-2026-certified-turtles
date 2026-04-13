@@ -212,7 +212,6 @@ def _invoke_subagent(
         model,
         inner_messages,
         tools=inner_tools,
-        max_tool_rounds=spec.max_inner_rounds,
         delegate_depth=delegate_depth + 1,
         max_delegate_depth=max_delegate_depth,
         **inner_kw,
@@ -252,6 +251,20 @@ def _execute_tool_call(
     return run_primitive_tool(name, arguments)
 
 
+def _estimate_tokens(messages: list[dict[str, Any]]) -> int:
+    """Rough token estimate: ~4 chars per token across all message content."""
+    total_chars = 0
+    for m in messages:
+        content = m.get("content", "")
+        if isinstance(content, str):
+            total_chars += len(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    total_chars += len(str(part.get("text", "")))
+    return total_chars // 4
+
+
 def run_agent_chat(
     client: MWSGPTClient,
     model: str,
@@ -259,7 +272,7 @@ def run_agent_chat(
     *,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: str | dict[str, Any] | None = "auto",
-    max_tool_rounds: int = 10,
+    max_agent_tokens: int = 128_000,
     delegate_depth: int = 0,
     max_delegate_depth: int = 3,
     request_context: RequestContext | None = None,
@@ -268,16 +281,19 @@ def run_agent_chat(
     """
     Цикл оркестратора: при ненулевом списке тулов — единый JSON-протокол в ответах assistant
     (см. `json_agent_protocol`) и исполнение `calls`; иначе — одиночный chat без протокола.
+
+    Stops when cumulative tokens exceed `max_agent_tokens` or hard round ceiling (200) is hit.
     """
+    _HARD_ROUND_CEILING = 200
     with use_request_context(request_context or RequestContext(session_id="global", scope_id="global")):
         work = copy.deepcopy(messages)
         tool_list = get_parent_tools() if tools is None else tools
         use_json_protocol = bool(tool_list)
         _agent_log.debug(
-            "run_agent_chat start model=%s depth=%s max_rounds=%s json_proto=%s tools=%s",
+            "run_agent_chat start model=%s depth=%s max_agent_tokens=%s json_proto=%s tools=%s",
             model,
             delegate_depth,
-            max_tool_rounds,
+            max_agent_tokens,
             use_json_protocol,
             len(tool_list or []),
         )
@@ -288,25 +304,34 @@ def run_agent_chat(
         allowed = _tool_names_from_openai_tools(tool_list) if tool_list else set()
         last_raw: dict[str, Any] | None = None
         rounds = 0
+        tokens_used = 0
         json_repair_attempts = _json_repair_attempts_budget()
 
-        while rounds < max_tool_rounds:
+        while tokens_used < max_agent_tokens and rounds < _HARD_ROUND_CEILING:
             rounds += 1
-            call_kwargs = {k: v for k, v in chat_kwargs.items() if k not in ("tools", "tool_choice", "request_context")}
+            call_kwargs = {k: v for k, v in chat_kwargs.items() if k not in ("tools", "tool_choice", "request_context", "max_tool_rounds")}
             if not use_json_protocol:
                 if tools is not None and tool_choice is not None:
                     call_kwargs["tool_choice"] = tool_choice
                 if tools is not None:
                     call_kwargs["tools"] = tools
             _agent_log.debug(
-                "--- round %s/%s messages_in_flight=%s call_kwargs_keys=%s",
+                "--- round %s tokens=%s/%s messages_in_flight=%s call_kwargs_keys=%s",
                 rounds,
-                max_tool_rounds,
+                tokens_used,
+                max_agent_tokens,
                 len(work),
                 sorted(call_kwargs.keys()),
             )
             _agent_log.debug("round %s request history:\n%s", rounds, summarize_messages(work, preview=300))
             last_raw = client.chat_completions(model, work, **call_kwargs)
+            # Track token usage
+            usage = last_raw.get("usage") if isinstance(last_raw, dict) else None
+            if isinstance(usage, dict) and "total_tokens" in usage:
+                tokens_used += int(usage["total_tokens"])
+            else:
+                tokens_used += _estimate_tokens(work[-1:])  # fallback estimate
+            _agent_log.debug("round %s tokens_used=%s / %s", rounds, tokens_used, max_agent_tokens)
             choice = _first_choice(last_raw)
             msg = _choice_message(choice)
             raw_text = message_text_content(msg)
@@ -459,7 +484,7 @@ def run_agent_chat(
                 visible = extract_user_visible_assistant_text(message_text_content(lm))
             except ValueError:
                 visible = ""
-        tail = "\n\n[лимит раундов агента: ответ может быть неполным.]" if not visible.strip() else ""
+        tail = "\n\n[лимит токенов агента: ответ может быть неполным.]" if not visible.strip() else ""
         patched = patch_completion_assistant_markdown(last_raw or {}, (visible or "") + tail)
         _agent_log.debug(
             "run_agent_chat TRUNCATED rounds_used=%s visible_preview=\n%s",

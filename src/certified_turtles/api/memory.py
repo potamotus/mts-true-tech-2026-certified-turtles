@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -19,22 +20,69 @@ from certified_turtles.memory_runtime.storage import (
     write_memory_file,
 )
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["memory"])
 
 DEFAULT_SCOPE = "default-scope"
+
+GENERATING_PLACEHOLDER = "✨ …"
+
+
+def _generate_name_sync(body: str, mem_type: str) -> str:
+    """Call LLM to generate a categorical name for a memory."""
+    from certified_turtles.mws_gpt.client import MWSGPTClient
+    try:
+        client = MWSGPTClient()
+        resp = client.chat_completions(
+            "mws-gpt-4.1-mini",
+            [
+                {"role": "system", "content": (
+                    "Generate a short categorical title (3-7 words) for a memory note. "
+                    "The title should describe the CATEGORY, not the specific content. "
+                    "Examples: 'Вкусовые предпочтения', 'Опыт работы и навыки', 'Дедлайны проекта'. "
+                    "Reply with ONLY the title, nothing else. Use the same language as the input."
+                )},
+                {"role": "user", "content": f"Type: {mem_type}\nContent: {body[:500]}"},
+            ],
+        )
+        name = resp["choices"][0]["message"]["content"].strip().strip('"\'')
+        return name[:200] if name else "Untitled"
+    except Exception as e:
+        log.warning("Name generation failed: %s", e)
+        return "Untitled"
+
+
+async def _generate_name_and_update(scope_id: str, filename: str, body: str, description: str, mem_type: str):
+    """Background task: generate name via LLM, then update the file."""
+    name = await asyncio.get_event_loop().run_in_executor(None, _generate_name_sync, body, mem_type)
+    try:
+        write_memory_file(
+            scope_id,
+            name=name,
+            description=description,
+            type_=mem_type,
+            body=body,
+            filename=filename,
+            source="ui",
+        )
+    except Exception as e:
+        log.warning("Failed to update memory name: %s", e)
 
 
 @router.get("/memory")
 async def list_memories(scope_id: str = Query(DEFAULT_SCOPE)) -> dict[str, Any]:
     headers = scan_memory_headers(scope_id)
+    root = memory_dir(scope_id)
     items = []
     for h in headers:
+        body = read_body(root / h.filename)
         items.append({
             "filename": h.filename,
             "name": h.name,
-            "description": h.description,
+            "description": body or h.description,
             "type": h.type,
             "mtime": h.mtime,
+            "body": body,
         })
     return {"scope_id": scope_id, "memories": items}
 
@@ -69,10 +117,11 @@ async def put_memory(
     req: MemoryWriteRequest,
     scope_id: str = Query(DEFAULT_SCOPE),
 ) -> dict[str, Any]:
+    # Save immediately with placeholder name
     try:
         path = write_memory_file(
             scope_id,
-            name=req.name,
+            name=GENERATING_PLACEHOLDER,
             description=req.description,
             type_=req.type,
             body=req.body,
@@ -81,6 +130,8 @@ async def put_memory(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    # Generate proper name in background
+    asyncio.create_task(_generate_name_and_update(scope_id, filename, req.body, req.description, req.type))
     return {"ok": True, "filename": filename, "path": str(path)}
 
 

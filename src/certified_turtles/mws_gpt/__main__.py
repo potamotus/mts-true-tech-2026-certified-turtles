@@ -103,7 +103,7 @@ def cmd_agent(args: argparse.Namespace, client: MWSGPTClient) -> int:
     out = service.run_agent(
         args.model,
         messages,
-        max_tool_rounds=args.max_tool_rounds,
+        max_agent_tokens=getattr(args, "max_agent_tokens", None),
         **extra,
     )
     _print_json(out)
@@ -172,10 +172,10 @@ def main(argv: list[str] | None = None) -> int:
     p_agent.add_argument("--temperature", type=float, default=None)
     p_agent.add_argument("--max-tokens", type=int, default=None)
     p_agent.add_argument(
-        "--max-tool-rounds",
+        "--max-agent-tokens",
         type=int,
-        default=int(os.environ.get("AGENT_MAX_TOOL_ROUNDS", "10")),
-        help="Максимум запросов к chat/completions (включая вызовы после tool)",
+        default=int(os.environ.get("CT_MAX_AGENT_TOKENS", "128000")),
+        help="Token budget for the agent loop",
     )
     p_agent.set_defaults(func=cmd_agent)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
+from certified_turtles.services.llm import LLMService
 
 
 class FakeClient:
@@ -51,15 +51,6 @@ def test_chat_respects_explicit_empty_tools():
     assert "tools" not in kwargs
 
 
-def test_clamp_agent_tool_rounds():
-    assert clamp_agent_tool_rounds(1) == 1
-    assert clamp_agent_tool_rounds(40) == 40
-    assert clamp_agent_tool_rounds(999) == 40
-    assert clamp_agent_tool_rounds(0) == 1
-    assert clamp_agent_tool_rounds("nope") == 10
-    assert clamp_agent_tool_rounds(15.7) == 15
-
-
 def test_run_agent_json_protocol_no_openai_tools_kwarg(monkeypatch):
     monkeypatch.setattr(
         "certified_turtles.agents.loop.run_primitive_tool",
@@ -68,17 +59,17 @@ def test_run_agent_json_protocol_no_openai_tools_kwarg(monkeypatch):
     final = {"choices": [{"message": {"role": "assistant", "content": "done"}}]}
     fake = FakeClient(final)
     svc = LLMService(fake)  # type: ignore[arg-type]
-    out = svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_tool_rounds=1)
+    out = svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_agent_tokens=1000)
     assert out["completion"]["choices"][0]["message"]["content"] == "done"
     kwargs = fake.calls[0]["kwargs"]
     assert "tools" not in kwargs
 
 
-def test_run_agent_clamps_rounds_before_loop(monkeypatch):
+def test_run_agent_passes_token_budget(monkeypatch):
     seen: dict[str, int] = {}
 
-    def fake_run_agent_chat(client, model, messages, *, max_tool_rounds: int = 10, **kwargs):
-        seen["max_tool_rounds"] = max_tool_rounds
+    def fake_run_agent_chat(client, model, messages, *, max_agent_tokens: int = 128_000, **kwargs):
+        seen["max_agent_tokens"] = max_agent_tokens
         return {
             "messages": messages,
             "completion": {"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
@@ -89,5 +80,5 @@ def test_run_agent_clamps_rounds_before_loop(monkeypatch):
     monkeypatch.setattr("certified_turtles.services.llm.run_agent_chat", fake_run_agent_chat)
     fake = FakeClient({"choices": [{"message": {"role": "assistant", "content": "x"}}]})
     svc = LLMService(fake)  # type: ignore[arg-type]
-    svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_tool_rounds=500)
-    assert seen["max_tool_rounds"] == 40
+    svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_agent_tokens=256_000)
+    assert seen["max_agent_tokens"] == 256_000

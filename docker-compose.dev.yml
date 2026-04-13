@@ -1,0 +1,7 @@
+# Dev override: API runs locally, open-webui connects to host.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-deps open-webui
+services:
+  open-webui:
+    environment:
+      OPENAI_API_BASE_URL: http://host.docker.internal:8000/v1
+      CT_API_BASE: http://host.docker.internal:8000

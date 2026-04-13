@@ -48,7 +48,7 @@ class ForkRuntime:
         session_id: str,
         agent_id: str,
         prompt: str,
-        max_tool_rounds: int | None = None,
+        max_agent_tokens: int | None = None,
     ) -> dict[str, Any] | None:
         snap = self.get_snapshot(session_id)
         spec = get_subagent(agent_id)
@@ -74,7 +74,6 @@ class ForkRuntime:
             snap.model,
             work,
             tools=tool_list,
-            max_tool_rounds=max_tool_rounds or spec.max_inner_rounds,
             request_context=RequestContext(
                 session_id=snap.session_id,
                 scope_id=snap.scope_id,

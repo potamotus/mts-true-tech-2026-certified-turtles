@@ -12,3 +12,5 @@ from . import mws_list_models as mws_list_models  # noqa: F401
 from . import read_workspace_file as read_workspace_file  # noqa: F401
 from . import web_search as web_search  # noqa: F401
 from . import workspace_file_path as workspace_file_path  # noqa: F401
+
+from . import mws_tables as mws_tables  # noqa: F401
