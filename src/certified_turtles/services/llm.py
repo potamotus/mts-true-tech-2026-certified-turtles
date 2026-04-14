@@ -7,6 +7,7 @@ from certified_turtles.agent_debug_log import agent_logger, summarize_messages
 from certified_turtles.agents.loop import run_agent_chat, stream_agent_chat
 from certified_turtles.memory_runtime import RequestContext
 from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
+from certified_turtles.mws_gpt.router import resolve_model
 from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
 
@@ -58,14 +59,20 @@ class LLMService:
         request_context: RequestContext | None = None,
         **extra: Any,
     ) -> Any:
-        """Одиночный запрос chat/completions. Если `tools` не заданы — подставляем полный каталог родителя."""
+        """Одиночный запрос chat/completions. Если model='auto' — автовыбор модели."""
         messages = normalize_chat_messages(messages)
+
+        # Авто-роутинг если model="auto"
+        resolved_model, routing = resolve_model(self._client, model, messages)
+        if routing:
+            _llm_log.info("Auto-routing: %s", routing.reason)
+
         _llm_log.debug("chat after normalize tools_explicit=%s\n%s", tools is not None, summarize_messages(messages))
         effective_tools = tools if tools is not None else get_parent_tools()
         call_kwargs = dict(extra)
         if effective_tools:
             call_kwargs.setdefault("tools", effective_tools)
-        return self._client.chat_completions(model, messages, **call_kwargs)
+        return self._client.chat_completions(resolved_model, messages, **call_kwargs)
 
     def chat_plain(
         self,
@@ -75,11 +82,17 @@ class LLMService:
         request_context: RequestContext | None = None,
         **extra: Any,
     ) -> Any:
-        """Один запрос к MWS без тулов и без агентского JSON-цикла (как обычный чат в Open WebUI)."""
+        """Один запрос к MWS без тулов. Если model='auto' — автовыбор модели."""
         messages = normalize_chat_messages(messages)
+
+        # Авто-роутинг если model="auto"
+        resolved_model, routing = resolve_model(self._client, model, messages)
+        if routing:
+            _llm_log.info("Auto-routing (plain): %s", routing.reason)
+
         _llm_log.debug("chat_plain after normalize\n%s", summarize_messages(messages))
         call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice", "request_context")}
-        return self._client.chat_completions(model, messages, **call_kwargs)
+        return self._client.chat_completions(resolved_model, messages, **call_kwargs)
 
     def chat_plain_stream(
         self,
@@ -104,8 +117,14 @@ class LLMService:
         request_context: RequestContext | None = None,
         **extra: Any,
     ) -> dict[str, Any]:
-        """Полный agent-цикл с тулами (примитивы + под-агенты)."""
+        """Полный agent-цикл с тулами (примитивы + под-агенты). Если model='auto' — автовыбор."""
         messages = normalize_chat_messages(messages)
+
+        # Авто-роутинг если model="auto"
+        resolved_model, routing = resolve_model(self._client, model, messages)
+        if routing:
+            _llm_log.info("Auto-routing (agent): %s", routing.reason)
+
         budget = max_agent_tokens or _DEFAULT_MAX_AGENT_TOKENS
         _llm_log.debug(
             "run_agent after normalize max_agent_tokens=%s tools_explicit=%s\n%s",
@@ -115,7 +134,7 @@ class LLMService:
         )
         return run_agent_chat(
             self._client,
-            model,
+            resolved_model,
             messages,
             tools=tools,
             max_agent_tokens=budget,
