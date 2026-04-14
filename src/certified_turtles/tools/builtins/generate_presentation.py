@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 _MAX_SLIDES = 25
 _MAX_BULLETS = 10
+_MAX_TITLE_LEN = 200
+_MAX_SUBTITLE_LEN = 300
 _SLIDE_KINDS: frozenset[str] = frozenset({"content", "section", "thanks", "image"})
 
 
@@ -50,6 +52,12 @@ def _default_image_caption(title: str, image_url: str | None) -> str:
 
 
 def _normalize_slide(idx: int, raw: Any) -> Slide | dict[str, str]:
+    # Модель иногда передаёт slide как JSON-строку — десериализуем.
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
     if not isinstance(raw, dict):
         return {"error": f"slides[{idx}] должен быть объектом с title/bullets"}
     title = raw.get("title")
@@ -98,10 +106,21 @@ def _handle_generate_presentation(arguments: dict[str, Any]) -> str:
     title = arguments.get("title")
     if not isinstance(title, str) or not title.strip():
         return json.dumps({"error": "Нужен непустой title."}, ensure_ascii=False)
+    if len(title.strip()) > _MAX_TITLE_LEN:
+        return json.dumps({"error": f"title слишком длинный (макс {_MAX_TITLE_LEN} символов)."}, ensure_ascii=False)
     subtitle_raw = arguments.get("subtitle") or ""
     subtitle = subtitle_raw if isinstance(subtitle_raw, str) else ""
+    if len(subtitle) > _MAX_SUBTITLE_LEN:
+        return json.dumps({"error": f"subtitle слишком длинный (макс {_MAX_SUBTITLE_LEN})."}, ensure_ascii=False)
 
     slides_raw = arguments.get("slides")
+    # Модель иногда передаёт slides как JSON-строку вместо массива — десериализуем.
+    if isinstance(slides_raw, str):
+        slides_raw = slides_raw.strip()
+        try:
+            slides_raw = json.loads(slides_raw)
+        except json.JSONDecodeError:
+            pass
     if not isinstance(slides_raw, list) or not slides_raw:
         return json.dumps(
             {"error": "slides должен быть непустым списком объектов {title, bullets}."},

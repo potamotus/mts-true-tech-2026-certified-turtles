@@ -28,11 +28,21 @@ def _handle_web_search(arguments: dict[str, Any]) -> str:
         max_results = int(raw_max)
     except (TypeError, ValueError):
         max_results = 5
+    max_results = max(1, min(max_results, 12))
     try:
         items = duckduckgo_text_search(q, max_results=max_results)
     except Exception as e:  # noqa: BLE001
         return json.dumps({"error": "search_failed", "detail": str(e)}, ensure_ascii=False)
-    return format_search_results_for_llm(items)
+    summary = format_search_results_for_llm(items)
+    return json.dumps(
+        {
+            "query": q,
+            "count": len(items),
+            "results": items,
+            "summary": summary,
+        },
+        ensure_ascii=False,
+    )
 
 
 register_tool(
@@ -54,8 +64,8 @@ register_tool(
                 },
                 "max_results": {
                     "type": "integer",
-                    "description": "Сколько результатов вернуть (1–10).",
-                    "default": 5,
+                    "description": "Сколько результатов вернуть (1–12).",
+                    "default": 8,
                 },
             },
             "required": ["query"],

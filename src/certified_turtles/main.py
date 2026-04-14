@@ -14,6 +14,8 @@ from certified_turtles.agent_debug_log import configure_agent_debug_from_env
 from certified_turtles.backend_log import get_backend_logger
 
 configure_agent_debug_from_env()
+from certified_turtles.agents.registry import SUB_AGENTS
+from certified_turtles.chat_modes import list_chat_mode_ids
 from certified_turtles.tools.builtins.google_docs import google_docs_capability_dict
 
 from certified_turtles.api.agent import router as agent_router
@@ -47,10 +49,21 @@ app.add_middleware(
 
 
 def _should_log_backend_request(method: str, path: str) -> bool:
-    if path in ("/v1/chat/completions", "/v1/plain/chat/completions"):
+    if path in (
+        "/v1/chat/completions",
+        "/v1/plain/chat/completions",
+        "/v1/audio/transcriptions",
+        "/v1/plain/audio/transcriptions",
+        "/v1/images/generations",
+        "/v1/plain/images/generations",
+    ):
         return method == "POST"
+    if method == "POST" and path.startswith("/v1/m/") and path.endswith("/chat/completions"):
+        return True
     if path in ("/v1/models", "/v1/plain/models"):
         return method == "GET"
+    if method == "GET" and path.startswith("/v1/m/") and path.endswith("/models"):
+        return True
     if path == "/api/v1/agent/chat":
         return method == "POST"
     if path == "/api/v1/uploads":
@@ -185,5 +198,46 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "capabilities": {
             "google_docs": google_docs_capability_dict(),
+            "voice_chat": {
+                "open_webui": True,
+                "hint": "Режим звонка в UI требует AUDIO_STT_ENGINE=openai (не web) и тот же OPENAI_API_BASE_URL, что и чат; ASR: прокси /v1/audio/transcriptions, CT_ASR_MODEL.",
+            },
+            "audio_asr": {
+                "proxy": "/v1/audio/transcriptions",
+                "open_webui_server_stt": "AUDIO_STT_ENGINE=openai при том же OPENAI_API_BASE_URL",
+                "chat_auto_transcribe": "CT_CHAT_AUTO_ASR=1 — расшифровка при вложении аудио в сообщение",
+                "tool": "transcribe_workspace_audio",
+            },
+            "vision_vlm": {
+                "multimodal_messages": True,
+                "hint": "Части image_url уходят в MWS; выберите модель с поддержкой зрения.",
+            },
+            "image_generation": {
+                "proxy": "/v1/images/generations",
+                "chat_completions_bridge": (
+                    "Модели из CT_MWS_IMAGE_CHAT_MODELS (по умолчанию qwen-image, qwen-image-lightning) "
+                    "в MWS не поддерживают chat/completions — фасад вызывает images/generations и отдаёт markdown."
+                ),
+            },
+            "deep_research": {
+                "subagent": "deep_research",
+                "tool": "agent_deep_research",
+                "engine": "GPT Researcher — https://github.com/assafelovic/gpt-researcher (venv: scripts/bootstrap_gpt_researcher_venv.sh)",
+            },
+            "chat_modes": {
+                "recommended_open_webui_base": "http://<api>:8000/v1/m/deep_research — отдельное подключение, список моделей без размножения (переключатель в сайдбаре).",
+                "list_variant_models_env": "CT_LIST_MODE_VARIANTS=1 — добавить deep_research::id в GET /v1/models (раздувает список).",
+                "json_field": "ct_mode",
+                "message_prefix": "[CT_MODE:<id>]",
+                "available": list_chat_mode_ids(),
+                "virtual_model_pattern": "<mode>::<mws_model_id>",
+            },
+            "subagents": {spec.id: (spec.blurb or "").strip() for spec in sorted(SUB_AGENTS.values(), key=lambda s: s.id)},
+            "extras": [
+                "execute_python",
+                "generate_presentation",
+                "generate_image",
+                "workspace_uploads",
+            ],
         },
     }

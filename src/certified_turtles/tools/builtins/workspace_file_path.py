@@ -31,6 +31,13 @@ def resolve_workspace_upload_file(file_id: str) -> tuple[str, Path] | None:
     if name != raw or ".." in raw or "/" in raw or "\\" in raw:
         return None
     path = uploads_dir() / name
+    # Extra guard: resolved path must stay within uploads_dir
+    try:
+        resolved = path.resolve(strict=False)
+        if not str(resolved).startswith(str(uploads_dir().resolve())):
+            return None
+    except (OSError, ValueError):
+        return None
     if not path.is_file():
         return None
     return name, path
@@ -59,11 +66,16 @@ def _handle_workspace_file_path(arguments: dict[str, Any]) -> str:
             return json.dumps({"error": "Некорректный file_id."}, ensure_ascii=False)
         return json.dumps({"error": "Файл не найден. Сначала загрузите через POST /api/v1/uploads."}, ensure_ascii=False)
     name, path = resolved
+    try:
+        size_b = path.stat().st_size
+    except OSError:
+        size_b = None
     return json.dumps(
         {
             "file_id": name,
             "absolute_path": str(path.resolve()),
             "suffix": path.suffix.lower(),
+            "size_bytes": size_b,
             "hint": (
                 "В execute_python передай тот же file_id во второй аргумент `file_id` тула или вставь absolute_path в pd.read_csv(path). "
                 "Не вызывай workspace_file_path() внутри Python — это отдельный тул."

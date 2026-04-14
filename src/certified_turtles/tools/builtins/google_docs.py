@@ -7,6 +7,7 @@ import os
 import re
 from typing import Any
 
+from certified_turtles.prompts import load_prompt
 from certified_turtles.tools.registry import ToolSpec, register_tool
 
 logger = logging.getLogger(__name__)
@@ -80,35 +81,24 @@ def agent_system_prompt_google_docs_section() -> str:
     email = google_docs_client_email()
     ready = google_docs_ready()
     cred_path = google_docs_credentials_path()
-    lines = [
-        "=== Google Docs (объясни пользователю простыми шагами) ===",
-        "Тулы: **google_docs_read** — текст документа; **google_docs_append** — дописать plain text в конец.",
-        "",
-        "**Чтение без ключа сервера (для пользователя):** в Google Doc → «Настройки доступа» / «Поделиться» → "
-        "«Ограничений нет» или **«Все, у кого есть ссылка»** → роль **Читатель** (или выше). Пользователь вставляет "
-        "ссылку на документ — вызывай google_docs_read с document_id = ссылка или ID из URL.",
-        "",
-        "**Запись в документ (google_docs_append):** нужен JSON service account на сервере и расшаривание документа "
-        "на email сервис-аккаунта с ролью **Редактор** (это настраивает админ, не «доступ для всех»).",
-    ]
     if ready and email:
-        lines.append(f"На сервере задан ключ: client_email для шаринга при записи: **{email}**.")
+        status_paragraph = f"На сервере задан ключ: client_email для шаринга при записи: **{email}**."
     elif ready and not email:
-        lines.append(
+        status_paragraph = (
             "Файл ключа на сервере есть, но не прочитан client_email — проверьте формат JSON service account."
         )
     elif google_docs_python_libs_ok() and cred_path and not os.path.isfile(cred_path):
-        lines.append(
+        status_paragraph = (
             "Указан GOOGLE_DOCS_CREDENTIALS_JSON, но файла по пути нет — попроси админа проверить volume в Docker."
         )
     elif not google_docs_python_libs_ok():
-        lines.append("Пакеты Google API не установлены в API (для append нужен образ с `extra google`).")
+        status_paragraph = "Пакеты Google API не установлены в API (для append нужен образ с `extra google`)."
     else:
-        lines.append("Ключ сервис-аккаунта на сервере не задан — **чтение по публичной ссылке всё равно работает**; append без ключа недоступен.")
-    lines.append(
-        "Если read вернул google_docs_public_access_failed — повтори шаги с доступом «по ссылке» для читателя."
-    )
-    return "\n".join(lines)
+        status_paragraph = (
+            "Ключ сервис-аккаунта на сервере не задан — **чтение по публичной ссылке всё равно работает**; "
+            "append без ключа недоступен."
+        )
+    return load_prompt("google_docs_agent_section.md").format(status_paragraph=status_paragraph).strip()
 
 
 def _build_docs_service():
@@ -175,13 +165,14 @@ def _append_text(service: Any, document_id: str, text: str) -> dict[str, Any]:
     return {"inserted_at_index": insert_index, "chars": len(text)}
 
 
-def _read_via_public_export(document_id: str) -> str:
+def _read_via_public_export(document_id: str, *, max_chars: int | None = None) -> str:
     """Чтение через export?format=txt — работает для документов с доступом «все по ссылке» (читатель)."""
     from certified_turtles.tools.fetch_url import fetch_url_text
 
     url = f"https://docs.google.com/document/d/{document_id}/export?format=txt"
-    max_chars = int(os.environ.get("GOOGLE_DOCS_READ_MAX_CHARS", "120000"))
-    max_chars = max(5000, min(max_chars, 500_000))
+    if max_chars is None:
+        max_chars = int(os.environ.get("GOOGLE_DOCS_READ_MAX_CHARS", "120000"))
+    max_chars = max(5000, min(int(max_chars), 500_000))
     try:
         data = fetch_url_text(url, max_chars=max_chars, timeout=25)
     except RuntimeError as e:
@@ -216,6 +207,19 @@ def _handle_google_docs_read(arguments: dict[str, Any]) -> str:
     if not isinstance(raw_id, str) or not raw_id.strip():
         return json.dumps({"error": "Нужен document_id (ID или URL Google Doc)."}, ensure_ascii=False)
     document_id = _parse_document_id(raw_id)
+    raw_limit = arguments.get("max_chars")
+    try:
+        env_max = int(os.environ.get("GOOGLE_DOCS_READ_MAX_CHARS", "120000"))
+    except (TypeError, ValueError):
+        env_max = 120_000
+    if raw_limit is not None:
+        try:
+            max_chars = int(raw_limit)
+        except (TypeError, ValueError):
+            max_chars = env_max
+    else:
+        max_chars = env_max
+    max_chars = max(1000, min(max_chars, 500_000))
 
     service, _err = _build_docs_service()
     if service is not None:
@@ -224,7 +228,6 @@ def _handle_google_docs_read(arguments: dict[str, Any]) -> str:
             title = doc.get("title") or ""
             body = doc.get("body") or {}
             text = _extract_plain_text(body if isinstance(body, dict) else {})
-            max_chars = int(os.environ.get("GOOGLE_DOCS_READ_MAX_CHARS", "120000"))
             truncated = len(text) > max_chars
             if truncated:
                 text = text[:max_chars]
@@ -241,7 +244,7 @@ def _handle_google_docs_read(arguments: dict[str, Any]) -> str:
         except Exception as e:  # noqa: BLE001
             logger.info("google_docs API read failed, fallback public export: %s", e)
 
-    return _read_via_public_export(document_id)
+    return _read_via_public_export(document_id, max_chars=max_chars)
 
 
 def _handle_google_docs_append(arguments: dict[str, Any]) -> str:
@@ -291,6 +294,10 @@ register_tool(
                 "document_id": {
                     "type": "string",
                     "description": "ID документа или полная ссылка вида https://docs.google.com/document/d/…/edit",
+                },
+                "max_chars": {
+                    "type": "integer",
+                    "description": "Необязательно: лимит символов текста (1000–500000; иначе из env GOOGLE_DOCS_READ_MAX_CHARS).",
                 },
             },
             "required": ["document_id"],

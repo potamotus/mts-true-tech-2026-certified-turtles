@@ -22,6 +22,13 @@ ALLOWED_UPLOAD_EXTENSIONS = frozenset(
         ".yml",
         ".py",
         ".xlsx",
+        # Аудио: загрузка и ASR (POST /v1/audio/transcriptions, тул transcribe_workspace_audio)
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".ogg",
+        ".webm",
+        ".flac",
     }
 )
 

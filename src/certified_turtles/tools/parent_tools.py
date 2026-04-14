@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from certified_turtles.agents.registry import SUB_AGENTS, SubAgentSpec
+from certified_turtles.agents.registry import CODER_AGENT_ID, SUB_AGENTS, SubAgentSpec
+from certified_turtles.prompts import load_prompt
 from certified_turtles.tools.registry import openai_definitions_all_primitives
 
 AGENT_TOOL_PREFIX = "agent_"
@@ -15,6 +16,8 @@ def agent_openai_tool(spec: SubAgentSpec) -> dict[str, Any]:
         spec.blurb.strip() if spec.blurb else "",
         "Передай поле task: что сделать. Опционально context — выдержка из основного диалога.",
     ]
+    if spec.id == CODER_AGENT_ID:
+        desc_parts.append(load_prompt("parent_tools_agent_coder_note.txt").strip())
     return {
         "type": "function",
         "function": {

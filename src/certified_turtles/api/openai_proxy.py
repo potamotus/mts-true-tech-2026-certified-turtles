@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
-import threading
+import os
 import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from certified_turtles.agents.json_agent_protocol import (
@@ -18,8 +19,14 @@ from certified_turtles.agents.json_agent_protocol import (
 from certified_turtles.agent_debug_log import agent_logger, debug_clip, summarize_messages
 from certified_turtles.memory_runtime import RequestContext, runtime_from_env
 from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
-from certified_turtles.api.agent_config import get_max_agent_tokens
-from certified_turtles.services.llm import LLMService
+from certified_turtles.chat_modes import prepare_chat_request, resolve_mode_path_segment
+from certified_turtles.model_mode import (
+    apply_virtual_model_to_body,
+    merge_virtual_models_openai_payload,
+    should_merge_virtual_models_into_list,
+)
+from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
+from certified_turtles.services.message_normalize import normalize_chat_messages
 
 router = APIRouter(tags=["openai-proxy"])
 _proxy_log = agent_logger("openai_proxy")
@@ -34,6 +41,7 @@ _PASS_THROUGH_IGNORE = {
     "use_agent",
     "ct_use_agent",
     "agent_mode",
+    "ct_mode",
 }
 
 
@@ -44,12 +52,111 @@ def _service() -> LLMService:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
+def _mws_image_chat_model_ids() -> set[str]:
+    """Модели MWS, у которых генерация картинок только через /v1/images/generations (chat/completions → 404)."""
+    raw = (os.environ.get("CT_MWS_IMAGE_CHAT_MODELS") or "qwen-image,qwen-image-lightning").strip()
+    return {x.strip() for x in raw.split(",") if x.strip()}
+
+
+def _is_mws_image_chat_model(model: str) -> bool:
+    return model.strip() in _mws_image_chat_model_ids()
+
+
+def _last_user_prompt_for_image(messages: list[dict[str, Any]]) -> str:
+    for m in reversed(messages):
+        if isinstance(m, dict) and m.get("role") == "user":
+            return message_text_content(m).strip()
+    return ""
+
+
+def _chat_completion_from_mws_images(model: str, img: Any) -> dict[str, Any]:
+    """Собирает chat.completion с markdown-картинкой для Open WebUI."""
+    if not isinstance(img, dict):
+        raise ValueError("Ответ images/generations не JSON-объект")
+    data = img.get("data")
+    if not isinstance(data, list) or not data:
+        raise ValueError("В ответе images нет data[]")
+    first = data[0] if isinstance(data[0], dict) else {}
+    url = first.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("В ответе images нет url")
+    alt = first.get("revised_prompt")
+    if not isinstance(alt, str) or not alt.strip():
+        alt = "image"
+    content = f"![{alt}]({url})\n"
+    return {
+        "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+
+async def _chat_completions_mws_image_model(
+    svc: LLMService,
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    stream: bool,
+    body: dict[str, Any],
+) -> Any:
+    """Обход 404: qwen-image в MWS не поддерживает chat/completions, только images/generations."""
+    msgs = normalize_chat_messages(copy.deepcopy(messages))
+    prompt = _last_user_prompt_for_image(msgs)
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail="Нужен непустой текст пользователя (промпт) для генерации изображения.",
+        )
+    payload: dict[str, Any] = {"model": model, "prompt": prompt, "n": 1}
+    size = body.get("size")
+    if isinstance(size, str) and size.strip():
+        payload["size"] = size.strip()
+    else:
+        payload["size"] = "1024x1024"
+    for key in ("quality", "response_format", "style"):
+        v = body.get(key)
+        if isinstance(v, str) and v.strip():
+            payload[key] = v.strip()
+    try:
+        img = await asyncio.to_thread(svc.images_generations, payload)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+    try:
+        completion = _chat_completion_from_mws_images(model, img)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    completion = _completion_with_visible_markdown(completion)
+    _proxy_log.debug(
+        "mws image chat completion model=%s stream=%s preview=\n%s",
+        model,
+        stream,
+        debug_clip(_final_assistant_content(completion)),
+    )
+    if not stream:
+        return completion
+    return StreamingResponse(_sse_stream(model, completion), media_type="text/event-stream")
+
+
 @router.get("/v1/models")
 async def list_models() -> Any:
     svc = _service()
     try:
         # list_models ходит в MWS по сети — не блокируем event loop (параллель с /v1/chat/completions).
-        return await asyncio.to_thread(svc.list_models)
+        raw = await asyncio.to_thread(svc.list_models)
+        if should_merge_virtual_models_into_list():
+            return merge_virtual_models_openai_payload(raw)
+        return raw
     except MWSGPTError as e:
         raise HTTPException(
             status_code=http_status_for_mws_error(e),
@@ -61,6 +168,117 @@ async def list_models() -> Any:
 async def list_models_plain_prefix() -> Any:
     """Тот же /v1/models, если в Open WebUI заведено отдельное подключение с base …/v1/plain."""
     return await list_models()
+
+
+@router.get("/v1/m/{mode}/models")
+async def list_models_for_mode(mode: str) -> Any:
+    """Список моделей MWS без размножения; режим задаётся URL подключения (см. POST …/v1/m/{mode}/chat/completions)."""
+    try:
+        resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    svc = _service()
+    try:
+        return await asyncio.to_thread(svc.list_models)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.get("/v1/m/{mode}/plain/models")
+async def list_models_for_mode_plain(mode: str) -> Any:
+    """То же для base …/v1/m/{mode}/plain."""
+    return await list_models_for_mode(mode)
+
+
+async def _audio_transcriptions_impl(
+    file: UploadFile,
+    model: str | None,
+    language: str | None,
+    prompt: str | None,
+    response_format: str | None,
+) -> Any:
+    svc = _service()
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    fn = file.filename or "audio.bin"
+    try:
+        return await asyncio.to_thread(
+            svc.client.audio_transcriptions,
+            raw,
+            fn,
+            model=model,
+            language=language,
+            prompt=prompt,
+            response_format=response_format,
+        )
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.post("/v1/audio/transcriptions")
+async def audio_transcriptions(
+    file: UploadFile = File(...),
+    model: str | None = Form(None),
+    language: str | None = Form(None),
+    prompt: str | None = Form(None),
+    response_format: str | None = Form(None),
+) -> Any:
+    """OpenAI-совместимый ASR: прокси на MWS. В Open WebUI: AUDIO_STT_ENGINE=openai и тот же API base."""
+    return await _audio_transcriptions_impl(file, model, language, prompt, response_format)
+
+
+@router.post("/v1/plain/audio/transcriptions")
+async def audio_transcriptions_plain_prefix(
+    file: UploadFile = File(...),
+    model: str | None = Form(None),
+    language: str | None = Form(None),
+    prompt: str | None = Form(None),
+    response_format: str | None = Form(None),
+) -> Any:
+    """Тот же ASR при base URL …/v1/plain."""
+    return await _audio_transcriptions_impl(file, model, language, prompt, response_format)
+
+
+async def _images_generations_from_body(body: dict[str, Any]) -> Any:
+    svc = _service()
+    try:
+        return await asyncio.to_thread(svc.images_generations, body)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.post("/v1/images/generations")
+async def images_generations(request: Request) -> Any:
+    """Прокси на MWS POST /v1/images/generations (модели qwen-image и др.)."""
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    return await _images_generations_from_body(body)
+
+
+@router.post("/v1/plain/images/generations")
+async def images_generations_plain_prefix(request: Request) -> Any:
+    """То же при base URL …/v1/plain."""
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    return await _images_generations_from_body(body)
 
 
 def _completion_with_visible_markdown(completion: dict[str, Any]) -> dict[str, Any]:
@@ -89,28 +307,17 @@ def _final_assistant_content(completion: dict[str, Any]) -> str:
     return extract_user_visible_assistant_text(message_text_content(msg))
 
 
+# Длинный ответ одним SSE-событием ломает JSON.parse в Open WebUI (ошибка вида column ~3k в chunk JS).
+_SSE_CONTENT_CHUNK_CHARS = 400
+
+
 def _sse_stream(model: str, completion: dict[str, Any]):
     cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
     content = _final_assistant_content(completion)
-    role_chunk = {
-        "id": cid,
-        "object": "chat.completion.chunk",
-        "created": created,
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "delta": {"role": "assistant"},
-                "finish_reason": None,
-            }
-        ],
-    }
-    yield f"data: {json.dumps(role_chunk, ensure_ascii=False)}\n\n"
-    step = 320
-    for start in range(0, len(content), step):
-        piece = content[start : start + step]
-        chunk = {
+
+    def _line(delta: dict[str, Any], finish_reason: str | None) -> str:
+        payload = {
             "id": cid,
             "object": "chat.completion.chunk",
             "created": created,
@@ -118,13 +325,37 @@ def _sse_stream(model: str, completion: dict[str, Any]):
             "choices": [
                 {
                     "index": 0,
-                    "delta": {"content": piece},
-                    "finish_reason": None,
+                    "delta": delta,
+                    "finish_reason": finish_reason,
                 }
             ],
         }
-        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-    final_chunk = {
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    # Как у OpenAI: сначала роль, затем куски content, в конце finish_reason (короткие JSON-строки).
+    yield _line({"role": "assistant"}, None)
+    for i in range(0, len(content), _SSE_CONTENT_CHUNK_CHARS):
+        piece = content[i : i + _SSE_CONTENT_CHUNK_CHARS]
+        yield _line({"content": piece}, None)
+    yield _line({}, "stop")
+    yield "data: [DONE]\n\n"
+
+
+def _iter_text_chunks(text: str, *, size: int = _SSE_CONTENT_CHUNK_CHARS):
+    for i in range(0, len(text), size):
+        yield text[i : i + size]
+
+
+def _sse_line(
+    model: str,
+    cid: str,
+    created: int,
+    delta: dict[str, Any],
+    finish_reason: str | None,
+    *,
+    extra: dict[str, Any] | None = None,
+) -> str:
+    payload = {
         "id": cid,
         "object": "chat.completion.chunk",
         "created": created,
@@ -132,13 +363,108 @@ def _sse_stream(model: str, completion: dict[str, Any]):
         "choices": [
             {
                 "index": 0,
-                "delta": {},
-                "finish_reason": "stop",
+                "delta": delta,
+                "finish_reason": finish_reason,
             }
         ],
     }
-    yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
-    yield "data: [DONE]\n\n"
+    if extra:
+        payload.update(extra)
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _agent_sse_stream(
+    svc: LLMService,
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    max_tool_rounds: int,
+    extra: dict[str, Any],
+):
+    cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+    created = int(time.time())
+    cumulative_output: list[dict[str, Any]] = []
+    yield _sse_line(model, cid, created, {"role": "assistant"}, None)
+    try:
+        for event in svc.stream_agent(model, messages, max_tool_rounds=max_tool_rounds, **extra):
+            etype = event.get("type")
+            if etype == "done":
+                result = event.get("result") if isinstance(event.get("result"), dict) else {}
+                final_output = result.get("output") if isinstance(result.get("output"), list) else cumulative_output
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {},
+                    "stop",
+                    extra={"done": True, "output": final_output},
+                )
+                yield "data: [DONE]\n\n"
+                return
+            if etype == "reasoning_stream":
+                text = str(event.get("text") or "")
+                if not text.strip():
+                    continue
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {"reasoning": text, "ct_phase": "reasoning"},
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": "reasoning_stream"},
+                )
+                continue
+            if etype == "content_stream":
+                text = str(event.get("text") or "")
+                if not text.strip():
+                    continue
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {"content": text, "ct_phase": "final"},
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": "content_stream"},
+                )
+                continue
+            if etype not in ("reasoning", "status", "final"):
+                continue
+            text = str(event.get("text") or "")
+            if not text.strip():
+                continue
+            cumulative_output.append(copy.deepcopy(event))
+            rendered = text if etype != "status" else text.strip()
+            for piece in _iter_text_chunks(rendered):
+                delta: dict[str, Any] = {"ct_phase": etype}
+                if etype == "reasoning":
+                    delta["reasoning"] = piece
+                elif etype == "status":
+                    delta["tool_status"] = piece
+                elif etype == "final":
+                    delta["content"] = piece
+                    delta["final"] = piece
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    delta,
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": etype},
+                )
+    except (MWSGPTError, ValueError) as e:
+        err = f"\n\n[Ошибка агента: {e}]"
+        for piece in _iter_text_chunks(err):
+            yield _sse_line(
+                model,
+                cid,
+                created,
+                {"content": piece, "ct_phase": "error", "error": str(e)},
+                None,
+                extra={"output": cumulative_output, "ct_phase": "error"},
+            )
+        yield _sse_line(model, cid, created, {}, "stop")
+        yield "data: [DONE]\n\n"
+        return
 
 
 async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, prepared_messages, extra, *, skip_after_response: bool = False):
@@ -293,36 +619,33 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     extra = {k: v for k, v in body.items() if k not in _PASS_THROUGH_IGNORE}
 
     svc = _service()
-    runtime = runtime_from_env()
-    contract_mode = _request_contract_mode(body)
+    # MWS: qwen-image в /v1/models есть, но chat/completions для этих моделей → 404; генерация только images/generations.
+    if _is_mws_image_chat_model(model):
+        return await _chat_completions_mws_image_model(
+            svc, model, messages, stream=stream, body=body
+        )
+
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
-    # A request is a real user conversation unless it's a utility/meta task.
-    # Utility tasks (title generation, tool routing, etc.) should not trigger
-    # side-effects like memory extraction — only the main chat request should.
-    is_conversation = not (ow_meta_plain or ow_tool_router_plain or contract_mode in {"router", "meta_task"})
-    if contract_mode == "agent":
-        plain = bool(force_plain)
+    plain = force_plain or _wants_plain_chat(body) or ow_meta_plain or ow_tool_router_plain
+    if plain:
+        prepared = prepare_chat_request(body, messages, for_agent=False)
+        messages = prepared.messages
     else:
-        plain = (
-            force_plain
-            or contract_mode in {"plain", "chat", "router", "meta_task"}
-            or _wants_plain_chat(body)
-            or ow_meta_plain
-            or ow_tool_router_plain
-        )
-    session_id, scope_id = _request_ids(body)
-    prepared_messages = runtime.prepare_messages(
-        svc.client,
-        model=model,
-        messages=messages,
-        session_id=session_id,
-        scope_id=scope_id,
-    )
-    req_ctx = RequestContext(session_id=session_id, scope_id=scope_id, file_state_namespace=session_id)
-    if contract_mode in {"router", "meta_task"}:
-        _proxy_log.debug("explicit request contract mode=%s -> plain chat", contract_mode)
-    if ow_meta_plain and contract_mode is None and not force_plain and not _wants_plain_chat(body):
+        prepared = prepare_chat_request(body, messages, for_agent=True)
+        messages = prepared.messages
+        if prepared.max_tool_rounds_override is not None:
+            max_tool_rounds = max(max_tool_rounds, prepared.max_tool_rounds_override)
+        if prepared.forced_agent_id:
+            extra["forced_agent_id"] = prepared.forced_agent_id
+        if prepared.mode_applied:
+            _proxy_log.debug(
+                "ct_mode applied=%s forced_agent_id=%s max_tool_rounds=%s",
+                prepared.mode_applied,
+                prepared.forced_agent_id,
+                max_tool_rounds,
+            )
+    if ow_meta_plain and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui auxiliary ### Task -> plain chat (no agent JSON protocol)")
     if ow_tool_router_plain and contract_mode is None and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui Available Tools router -> plain chat (no agent JSON protocol)")
@@ -335,12 +658,18 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         sorted(extra.keys()),
         summarize_messages(prepared_messages, preview=400) if isinstance(prepared_messages, list) else str(type(prepared_messages)),
     )
-    # Plain + stream: true upstream SSE (pipe chunks directly from MWS).
-    if plain and stream:
+    if stream and not plain:
         return StreamingResponse(
-            _upstream_sse_stream(svc, model, prepared_messages, runtime, session_id, scope_id, prepared_messages, extra, skip_after_response=not is_conversation),
+            _agent_sse_stream(
+                svc,
+                model,
+                messages,
+                max_tool_rounds=max_tool_rounds,
+                extra=extra,
+            ),
             media_type="text/event-stream",
         )
+
     try:
         if plain:
             completion = await asyncio.to_thread(
@@ -397,6 +726,7 @@ async def chat_completions(request: Request) -> Any:
         raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    apply_virtual_model_to_body(body)
     return await _chat_completions_from_body(body, force_plain=False)
 
 
@@ -409,4 +739,41 @@ async def chat_completions_plain(request: Request) -> Any:
         raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    apply_virtual_model_to_body(body)
+    return await _chat_completions_from_body(body, force_plain=True)
+
+
+@router.post("/v1/m/{mode}/chat/completions")
+async def chat_completions_with_mode(mode: str, request: Request) -> Any:
+    """Режим из пути URL (отдельное подключение Open WebUI: base …/v1/m/deep_research) — без длинного списка моделей."""
+    try:
+        mode_id = resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    body["ct_mode"] = mode_id
+    apply_virtual_model_to_body(body)
+    return await _chat_completions_from_body(body, force_plain=False)
+
+
+@router.post("/v1/m/{mode}/plain/chat/completions")
+async def chat_completions_with_mode_plain(mode: str, request: Request) -> Any:
+    """Режим из пути + plain-чат (base …/v1/m/{mode}/plain)."""
+    try:
+        mode_id = resolve_mode_path_segment(mode)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    body["ct_mode"] = mode_id
+    apply_virtual_model_to_body(body)
     return await _chat_completions_from_body(body, force_plain=True)

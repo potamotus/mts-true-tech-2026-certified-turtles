@@ -15,6 +15,7 @@ from certified_turtles.tools.builtins.workspace_file_path import (
     resolve_workspace_upload_file,
 )
 from certified_turtles.tools.presentation import _storage_dir  # noqa: PLC2701
+from certified_turtles.prompts import load_prompt
 from certified_turtles.tools.registry import ToolSpec, register_tool
 from certified_turtles.tools.workspace_storage import uploads_dir
 
@@ -51,6 +52,11 @@ _ALLOWED_MODULE_PREFIXES: tuple[str, ...] = (
     "openpyxl",
     "pathlib",
     "sys",
+    # HTTP из песочницы: URL/ключ из запроса пользователя (не хардкод провайдера).
+    "urllib",
+    "http.client",
+    "ssl",
+    "requests",
 )
 
 _FORBIDDEN_CALL_NAMES = frozenset({"eval", "exec", "compile", "__import__", "input"})
@@ -327,16 +333,7 @@ def _handle_execute_python(arguments: dict[str, Any]) -> str:
 register_tool(
     ToolSpec(
         name="execute_python",
-        description=(
-            "Серверное выполнение Python: единственный способ реально запустить код здесь (анализ, расчёты, симуляции, графики). "
-            "Полный скрипт в `code`; таймаут; импорты только из белого списка; запрещены open(), .open(), eval/exec. "
-            "Таблицы: опционально передай `file_id` (как у workspace_file_path) — в скрипте будет константа CT_DATA_FILE_ABSPATH; "
-            "затем import pandas as pd; df = pd.read_csv(CT_DATA_FILE_ABSPATH, encoding='utf-8', on_bad_lines='skip'). "
-            "Либо сначала тул workspace_file_path и подставь absolute_path из JSON в read_csv. "
-            "Не вызывай workspace_file_path() внутри Python — такой функции нет. Не подставляй плейсхолдеры вместо file_id. "
-            "Если returncode не 0 — читай stderr, исправь код и вызови execute_python снова. "
-            "Графики сохраняй в CT_RUN_OUTPUT_DIR (см. pathlib.Path(CT_RUN_OUTPUT_DIR) / 'plot.png'). Ответ тула: stdout/stderr, артефакты."
-        ),
+        description=load_prompt("execute_python_tool_description.txt").strip(),
         parameters={
             "type": "object",
             "properties": {
@@ -350,6 +347,10 @@ register_tool(
                         "Необязательно: реальный file_id из [CT:…] или ответа workspace_file_path; "
                         "тогда в коде доступна строка CT_DATA_FILE_ABSPATH."
                     ),
+                },
+                "file_id_2": {
+                    "type": "string",
+                    "description": "Необязательно: второй загруженный файл; константа CT_DATA_FILE_ABSPATH_2.",
                 },
             },
             "required": ["code"],

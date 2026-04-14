@@ -4,8 +4,7 @@ import os
 from typing import Any, Iterator
 
 from certified_turtles.agent_debug_log import agent_logger, summarize_messages
-from certified_turtles.agents.loop import run_agent_chat
-from certified_turtles.memory_runtime import RequestContext
+from certified_turtles.agents.loop import run_agent_chat, stream_agent_chat
 from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
 from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
@@ -37,6 +36,9 @@ class LLMService:
 
     def list_models(self) -> Any:
         return self._client.list_models()
+
+    def images_generations(self, payload: dict[str, Any]) -> Any:
+        return self._client.images_generations(payload)
 
     def chat(
         self,
@@ -93,7 +95,7 @@ class LLMService:
         request_context: RequestContext | None = None,
         **extra: Any,
     ) -> dict[str, Any]:
-        """Полный agent-цикл с тулами (примитивы + под-агенты). Возвращает `messages`, `completion`, метаданные."""
+        """Полный agent-цикл с тулами (примитивы + под-агенты)."""
         messages = normalize_chat_messages(messages)
         budget = max_agent_tokens or _DEFAULT_MAX_AGENT_TOKENS
         _llm_log.debug(
@@ -109,5 +111,32 @@ class LLMService:
             tools=tools,
             max_agent_tokens=budget,
             request_context=request_context,
+            **extra,
+        )
+
+    def stream_agent(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        max_tool_rounds: int = 10,
+        tools: list[dict[str, Any]] | None = None,
+        **extra: Any,
+    ):
+        """Итератор событий agent-first рантайма: reasoning/status/final/done."""
+        messages = normalize_chat_messages(messages)
+        rounds = clamp_agent_tool_rounds(max_tool_rounds)
+        _llm_log.debug(
+            "stream_agent after normalize max_tool_rounds=%s tools_explicit=%s\n%s",
+            rounds,
+            tools is not None,
+            summarize_messages(messages),
+        )
+        return stream_agent_chat(
+            self._client,
+            model,
+            messages,
+            tools=tools,
+            max_tool_rounds=rounds,
             **extra,
         )

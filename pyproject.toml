@@ -14,6 +14,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     "python-pptx>=1.0.2",
     "uvicorn[standard]>=0.32.1",
+    "requests>=2.32.0",
 ]
 
 [project.urls]
@@ -40,6 +41,7 @@ google = [
     "google-api-python-client>=2.160.0",
     "google-auth>=2.35.0",
 ]
+# Изолированный venv: см. externals/requirements-gpt-researcher.txt и scripts/bootstrap_gpt_researcher_venv.sh
 
 [tool.uv]
 package = true

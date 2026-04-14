@@ -25,15 +25,20 @@ services:
       - path: .env
         required: false
     environment:
+      # Потоковый вывод Python в логах Docker (иначе буфер до конца запроса).
+      PYTHONUNBUFFERED: "1"
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
+      # ASR: id модели в MWS (см. GET /v1/models); whisper-1 на MWS может отсутствовать.
+      CT_ASR_MODEL: ${CT_ASR_MODEL:-whisper-medium}
       GENERATED_FILES_DIR: /data/generated
       UPLOADS_DIR: /data/generated/uploads
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
-      # Hot-reload: примонтированный ./src должен импортироваться раньше site-packages.
-      PYTHONPATH: /app/src
-      # Подробный трейс агента на stderr контейнера: [agent-debug] … (uvicorn остаётся --log-level error).
-      CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-}
+      # Интерпретатор из образа (Dockerfile); локально без Docker — .venv-gpt-researcher или GPT_RESEARCHER_PYTHON
+      GPT_RESEARCHER_PYTHON: ${GPT_RESEARCHER_PYTHON:-/opt/gpt-researcher-venv/bin/python}
+      # Подробный трейс агента на stderr: [agent-debug] … Смотреть: docker compose logs -f api
+      # Выключить шум: CT_AGENT_DEBUG=0 в .env
+      CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-1}
       CT_AGENT_DEBUG_MAX_CHARS: ${CT_AGENT_DEBUG_MAX_CHARS:-}
       # MWS Tables (tabs.mts.ru): токен из настроек профиля.
       MWS_TABLES_API_TOKEN: ${MWS_TABLES_API_TOKEN:-}
@@ -49,7 +54,17 @@ services:
     restart: unless-stopped
 
   open-webui:
-    build: ./open-webui
+    # Сборка из форка: переключатель Deep Research (ct_mode) в UI чата.
+    build:
+      context: ./open-webui-fork
+      dockerfile: Dockerfile
+      args:
+        # Стабильный кеш: одно и то же значение при `docker compose build` без лишних --build-arg.
+        # На 8 ГБ RAM хоста дефолт 3072; при «heap out of memory» (не SIGKILL) подними, напр. 4096.
+        NODE_HEAP_MB: ${NODE_HEAP_MB:-3072}
+        # Не качает sentence-transformers/whisper в слое pip при сборке — меньше диска и времени (RAG при первом use).
+        USE_SLIM: "${OPEN_WEBUI_USE_SLIM:-true}"
+    image: certified-turtles-open-webui:local
     container_name: open-webui
     depends_on:
       - api
@@ -66,10 +81,12 @@ services:
       ENABLE_OPENAI_API: "True"
       OPENAI_API_KEY: ${MWS_API_KEY:-}
       # Агент (тулы): http://api:8000/v1 — второе подключение «просто чат»: http://api:8000/v1/plain (см. README).
+      # Deep Research без раздувания списка моделей: второе подключение Open WebUI с
+      # OPENAI_API_BASE_URL: http://api:8000/v1/m/deep_research (см. prompts/openwebui_modes.md).
       OPENAI_API_BASE_URL: http://api:8000/v1
-      # Голос и live-режим (Call): STT/TTS через Web Speech API в браузере — без серверных моделей.
-      # MWS не даёт audio-эндпоинтов, поэтому используем встроенный движок браузера.
-      AUDIO_STT_ENGINE: "web"
+      # Голос: Web STT блокирует «режим звонка» в UI ($config.audio.stt.engine === 'web').
+      # Серверный ASR: тот же OPENAI_API_BASE_URL + /v1/audio/transcriptions (прокси api → MWS).
+      AUDIO_STT_ENGINE: "openai"
       AUDIO_TTS_ENGINE: "web"
       ENABLE_AUDIO_CONVERSATION: "True"
       # Все модели из ответа MWS /v1/models видны в селекторе; без ограничений «workspace».

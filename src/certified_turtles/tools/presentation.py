@@ -116,6 +116,10 @@ def _looks_like_raster_image(data: bytes) -> bool:
 def _download_image_bytes(url: str, *, max_bytes: int = 4_000_000, timeout: int = 20) -> bytes | None:
     if not url.startswith(("http://", "https://")):
         return None
+    from certified_turtles.tools.fetch_url import _is_safe_url
+
+    if not _is_safe_url(url):
+        return None
     req = Request(
         url,
         headers={
@@ -139,7 +143,12 @@ def _download_image_bytes(url: str, *, max_bytes: int = 4_000_000, timeout: int 
 
 
 def _add_picture_slide(prs: Presentation, slide: Slide) -> None:
-    layout = prs.slide_layouts[8]
+    try:
+        layout = prs.slide_layouts[8]
+    except IndexError:
+        # Theme has no picture layout — fall back to content slide
+        _add_content_slide(prs, slide)
+        return
     s = prs.slides.add_slide(layout)
     s.shapes.title.text = slide.title or ""
     caption_ph = s.placeholders[2] if len(s.placeholders) > 2 else None

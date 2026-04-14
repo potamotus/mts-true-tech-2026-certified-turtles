@@ -10,9 +10,19 @@ from pathlib import Path
 from typing import Any
 
 from certified_turtles.agent_debug_log import agent_logger, debug_clip
+from certified_turtles.asr_upload import maybe_auto_transcribe_upload
 from certified_turtles.tools.workspace_storage import extension_allowed, save_workspace_file
 
 _norm_log = agent_logger("message_normalize")
+
+_AUDIO_EXTS = frozenset({".mp3", ".wav", ".m4a", ".ogg", ".webm", ".flac"})
+
+
+def _is_audio_kind(mime: str, name: str) -> bool:
+    ml = (mime or "").lower()
+    if ml.startswith("audio/"):
+        return True
+    return Path(name).suffix.lower() in _AUDIO_EXTS
 
 # Open WebUI RAG: <source id="1" name="file.csv">…текст документа…</source>
 _SOURCE_BLOCK_RE = re.compile(r"<source\s+([^>]+)>([\s\S]*?)</source>", re.IGNORECASE)
@@ -222,7 +232,9 @@ def _file_part_to_blocks(part: dict[str, Any]) -> list[dict[str, Any]]:
 
     raw: bytes | None = None
     mime_from_payload = ""
-    if isinstance(data, str):
+    if isinstance(data, (bytes, bytearray)):
+        raw = bytes(data)
+    elif isinstance(data, str):
         du = _parse_data_url(data)
         if du:
             raw, mime_from_payload = du
@@ -233,6 +245,32 @@ def _file_part_to_blocks(part: dict[str, Any]) -> list[dict[str, Any]]:
     if raw is not None:
         fid = _persist_chat_attachment(raw, str(name), effective_mime)
         if fid:
+            if _is_audio_kind(effective_mime, str(name)):
+                transcript = maybe_auto_transcribe_upload(raw, str(name))
+                if transcript:
+                    return [
+                        {
+                            "type": "text",
+                            "text": (
+                                "[аудио: автоматическая расшифровка (ASR через MWS)]\n"
+                                f"{transcript}\n\n"
+                                f"[file_id: {fid}; оригинальное имя: {name}; "
+                                "при сбое или для другого языка — transcribe_workspace_audio]"
+                            ),
+                        }
+                    ]
+                return [
+                    {
+                        "type": "text",
+                        "text": (
+                            "[аудио сохранено в рабочую область агента]\n"
+                            f"file_id: {fid}\n"
+                            f"оригинальное имя: {name}\n"
+                            "Вызови transcribe_workspace_audio с этим file_id (или включи CT_CHAT_AUTO_ASR=1 "
+                            "для автоматической расшифровки при вложении)."
+                        ),
+                    },
+                ]
             return [
                 {
                     "type": "text",
@@ -278,6 +316,37 @@ def _part_to_blocks(part: Any) -> list[dict[str, Any]]:
         if isinstance(iu, dict) and isinstance(iu.get("url"), str):
             return [{"type": "image_url", "image_url": {"url": iu["url"], **{k: v for k, v in iu.items() if k != "url"}}}]
         return [{"type": "text", "text": json.dumps(part, ensure_ascii=False)[:8000]}]
+
+    if ptype == "input_image":
+        ii = part.get("input_image")
+        if isinstance(ii, dict) and isinstance(ii.get("url"), str):
+            return [{"type": "image_url", "image_url": {"url": ii["url"]}}]
+        return [{"type": "text", "text": json.dumps(part, ensure_ascii=False)[:8000]}]
+
+    if ptype == "input_audio":
+        ia = part.get("input_audio")
+        if not isinstance(ia, dict):
+            return [{"type": "text", "text": json.dumps(part, ensure_ascii=False)[:8000]}]
+        fmt = (ia.get("format") or "wav").strip() or "wav"
+        data = ia.get("data")
+        raw_audio: bytes | None = None
+        if isinstance(data, str):
+            du = _parse_data_url(data)
+            if du:
+                raw_audio, _ = du
+            else:
+                raw_audio = _try_decode_b64_string(data)
+                if raw_audio is None and data.strip():
+                    try:
+                        raw_audio = base64.b64decode(data.strip(), validate=False)
+                    except Exception:  # noqa: BLE001
+                        raw_audio = None
+        if raw_audio is None:
+            return [{"type": "text", "text": f"[input_audio: нет декодируемых данных, format={fmt}]"}]
+        mime = f"audio/{fmt}" if fmt in ("wav", "mp3", "webm", "ogg", "flac", "m4a") else "audio/wav"
+        return _file_part_to_blocks(
+            {"type": "file", "filename": f"recording.{fmt}", "mime_type": mime, "file": raw_audio},
+        )
 
     if ptype in ("file", "input_file"):
         return _file_part_to_blocks(part)

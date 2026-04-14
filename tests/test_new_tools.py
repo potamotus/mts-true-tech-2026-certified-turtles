@@ -22,13 +22,8 @@ def test_new_primitives_registered():
     assert "generate_image" in names
     assert "generate_presentation" in names
     assert "read_workspace_file" in names
+    assert "transcribe_workspace_audio" in names
     assert "execute_python" in names
-    assert "file_read" in names
-    assert "file_write" in names
-    assert "file_edit" in names
-    assert "glob_search" in names
-    assert "grep_search" in names
-    assert "mws_list_models" in names
     assert "google_docs_read" in names
     assert "google_docs_append" in names
 
@@ -41,13 +36,8 @@ def test_parent_tools_expose_all():
         "generate_image",
         "generate_presentation",
         "read_workspace_file",
+        "transcribe_workspace_audio",
         "execute_python",
-        "file_read",
-        "file_write",
-        "file_edit",
-        "glob_search",
-        "grep_search",
-        "mws_list_models",
         "google_docs_read",
         "google_docs_append",
     ):
@@ -60,11 +50,11 @@ def test_parent_tools_expose_all():
     assert f"agent_{MEMORY_TESTER_AGENT_ID}" in tool_names
 
 
-def test_deep_research_subagent_has_research_tools():
+def test_deep_research_subagent_uses_gpt_researcher_not_tool_loop():
     spec = get_subagent(DEEP_RESEARCH_AGENT_ID)
     assert spec is not None
-    assert "web_search" in spec.tool_names
-    assert "fetch_url" in spec.tool_names
+    assert spec.tool_names == ()
+    assert spec.max_inner_rounds == 1
 
 
 def test_coder_subagent_has_python_tools():
@@ -232,19 +222,38 @@ def test_web_search_refuses_url_query():
     assert data.get("error") == "bad_query"
 
 
-def test_mws_list_models_primitive(monkeypatch):
-    class StubClient:
-        def __init__(self, api_key=None, *, base_url=None):
-            pass
-
-        def list_models(self):
-            return {"object": "list", "data": [{"id": "mws-gpt-alpha", "owned_by": "mws"}]}
+def test_web_search_returns_structured_json(monkeypatch):
+    """Успешная выдача — JSON с results и summary (удобно парсить и читать)."""
+    import certified_turtles.tools.builtins.web_search as ws_builtin
 
     monkeypatch.setattr(
-        "certified_turtles.tools.builtins.mws_list_models.MWSGPTClient",
-        StubClient,
+        ws_builtin,
+        "duckduckgo_text_search",
+        lambda q, max_results=5: [
+            {"title": "T", "href": "https://a.example", "body": "snippet"},
+        ],
     )
-    out = run_primitive_tool("mws_list_models", {})
+    out = run_primitive_tool("web_search", {"query": "test query", "max_results": 3})
     data = json.loads(out)
-    assert data["data"][0]["id"] == "mws-gpt-alpha"
-    assert data["count"] == 1
+    assert data.get("query") == "test query"
+    assert data.get("count") == 1
+    assert len(data.get("results") or []) == 1
+    assert "summary" in data
+    assert "T" in data["summary"]
+
+
+def test_execute_python_allows_urllib_and_http_client(monkeypatch, tmp_path):
+    """HTTP из кода: urllib/http.client/ssl и requests (белый список)."""
+    monkeypatch.setenv("GENERATED_FILES_DIR", str(tmp_path / "gen"))
+    code = (
+        "import http.client\n"
+        "import ssl\n"
+        "import urllib.parse\n"
+        "import urllib.request\n"
+        "import requests\n"
+        "print('imports_ok', requests.__version__)\n"
+    )
+    out = run_primitive_tool("execute_python", {"code": code})
+    data = json.loads(out)
+    assert data.get("returncode") == 0, data
+    assert "imports_ok" in (data.get("stdout") or "")
