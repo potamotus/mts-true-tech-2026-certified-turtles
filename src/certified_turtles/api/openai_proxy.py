@@ -25,6 +25,7 @@ from certified_turtles.model_mode import (
     merge_virtual_models_openai_payload,
     should_merge_virtual_models_into_list,
 )
+from certified_turtles.api.agent_config import get_max_agent_tokens
 from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
 from certified_turtles.services.message_normalize import normalize_chat_messages
 
@@ -642,9 +643,23 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
             svc, model, messages, stream=stream, body=body
         )
 
+    runtime = runtime_from_env()
+    contract_mode = _request_contract_mode(body)
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
-    plain = force_plain or _wants_plain_chat(body) or ow_meta_plain or ow_tool_router_plain
+    is_conversation = not (ow_meta_plain or ow_tool_router_plain or contract_mode in {"router", "meta_task"})
+    max_tool_rounds = clamp_agent_tool_rounds(body.get("max_tool_rounds"))
+    if contract_mode == "agent":
+        plain = bool(force_plain)
+    else:
+        plain = (
+            force_plain
+            or contract_mode in {"plain", "chat", "router", "meta_task"}
+            or _wants_plain_chat(body)
+            or ow_meta_plain
+            or ow_tool_router_plain
+        )
+    session_id, scope_id = _request_ids(body)
     if plain:
         prepared = prepare_chat_request(body, messages, for_agent=False)
         messages = prepared.messages
@@ -662,7 +677,17 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
                 prepared.forced_agent_id,
                 max_tool_rounds,
             )
-    if ow_meta_plain and not force_plain and not _wants_plain_chat(body):
+    prepared_messages = runtime.prepare_messages(
+        svc.client,
+        model=model,
+        messages=messages,
+        session_id=session_id,
+        scope_id=scope_id,
+    )
+    req_ctx = RequestContext(session_id=session_id, scope_id=scope_id, file_state_namespace=session_id)
+    if contract_mode in {"router", "meta_task"}:
+        _proxy_log.debug("explicit request contract mode=%s -> plain chat", contract_mode)
+    if ow_meta_plain and contract_mode is None and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui auxiliary ### Task -> plain chat (no agent JSON protocol)")
     if ow_tool_router_plain and contract_mode is None and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui Available Tools router -> plain chat (no agent JSON protocol)")

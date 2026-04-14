@@ -993,6 +993,7 @@ def run_agent_chat(
     *,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: str | dict[str, Any] | None = "auto",
+    max_tool_rounds: int = 10,
     max_agent_tokens: int = 128_000,
     delegate_depth: int = 0,
     max_delegate_depth: int = 3,
