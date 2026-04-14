@@ -5,6 +5,7 @@ from typing import Any, Iterator
 
 from certified_turtles.agent_debug_log import agent_logger, summarize_messages
 from certified_turtles.agents.loop import run_agent_chat, stream_agent_chat
+from certified_turtles.memory_runtime import RequestContext
 from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
 from certified_turtles.services.message_normalize import normalize_chat_messages
 from certified_turtles.tools.parent_tools import get_parent_tools
@@ -12,6 +13,14 @@ from certified_turtles.tools.parent_tools import get_parent_tools
 _llm_log = agent_logger("llm")
 
 _DEFAULT_MAX_AGENT_TOKENS = 128_000
+
+
+def clamp_agent_tool_rounds(value: Any) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return 10
+    return max(1, min(n, 40))
 
 
 class LLMService:
