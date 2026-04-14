@@ -48,6 +48,7 @@ services:
       # GOOGLE_DOCS_CREDENTIALS_JSON: /secrets/google-docs-sa.json
     volumes:
       - generated-files:/data/generated
+      - memory-data:/tmp/certified_turtles_claude_like
       - ./src:/app/src
       # Пример монтирования ключа (рядом с compose: mkdir -p secrets && cp sa.json secrets/google-docs-sa.json):
       # - ./secrets/google-docs-sa.json:/secrets/google-docs-sa.json:ro
@@ -110,3 +111,4 @@ services:
 volumes:
   open-webui-data: {}
   generated-files: {}
+  memory-data: {}
