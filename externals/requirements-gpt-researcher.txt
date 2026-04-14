@@ -1,0 +1,3 @@
+# assafelovic/gpt-researcher — изолированный venv (см. scripts/bootstrap_gpt_researcher_venv.sh).
+# Не смешивать с основными зависимостями приложения: у пакета свой набор langchain.
+gpt-researcher==0.14.4

@@ -241,30 +241,30 @@ def build_protocol_system_message(tool_list: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
-def _parse_protocol_blob(blob: str) -> dict[str, Any] | None:
-    try:
-        data = json.loads(blob)
-    except json.JSONDecodeError:
-        logger.debug("parse_agent_response: JSONDecodeError")
-        return None
-    if not isinstance(data, dict):
-        return None
+def _normalize_protocol_dict(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Проверка и нормализация объекта протокола после json.loads (в т.ч. null от моделей)."""
     if "assistant_markdown" not in data or "calls" not in data:
         return None
     am = data.get("assistant_markdown")
-    if not isinstance(am, str):
+    if am is None:
+        am = ""
+    elif not isinstance(am, str):
         return None
-    calls = data.get("calls")
-    if not isinstance(calls, list):
+    calls_raw = data.get("calls")
+    if calls_raw is None:
+        calls_raw = []
+    if not isinstance(calls_raw, list):
         return None
     norm_calls: list[dict[str, Any]] = []
-    for i, c in enumerate(calls[:32]):
+    for c in calls_raw[:32]:
         if not isinstance(c, dict):
             continue
         name = c.get("name")
         if not isinstance(name, str) or not name.strip():
             continue
         args = c.get("arguments", {})
+        if args is None:
+            args = {}
         if isinstance(args, str):
             try:
                 args = json.loads(args or "{}")
@@ -274,6 +274,17 @@ def _parse_protocol_blob(blob: str) -> dict[str, Any] | None:
             args = {}
         norm_calls.append({"name": name.strip(), "arguments": args})
     return {"assistant_markdown": am, "calls": norm_calls}
+
+
+def _parse_protocol_blob(blob: str) -> dict[str, Any] | None:
+    try:
+        data = json.loads(blob)
+    except json.JSONDecodeError as e:
+        logger.debug("parse_agent_response: JSONDecodeError: %s", e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    return _normalize_protocol_dict(data)
 
 
 def iter_parsed_protocol_payloads(raw: str) -> list[dict[str, Any]]:
@@ -322,15 +333,72 @@ def iter_parsed_protocol_payloads_any(raw: str) -> list[dict[str, Any]]:
     return _lenient_protocol_payloads(raw)
 
 
-def parse_failure_log_preview(raw: str, *, max_chars: int = 900) -> str:
-    """Короткая выдержка сырого ответа для WARNING-логов (docker compose без CT_AGENT_DEBUG)."""
+def parse_failure_max_chars() -> int:
+    """Лимит символов для WARNING при parse failed; CT_AGENT_PARSE_FAILURE_LOG_MAX_CHARS=0 — без обрезки."""
+    raw = os.environ.get("CT_AGENT_PARSE_FAILURE_LOG_MAX_CHARS")
+    if raw is not None and raw.strip() == "0":
+        return 10**9
+    if raw is None or not str(raw).strip():
+        return 100_000
+    try:
+        n = int(raw.strip())
+    except (TypeError, ValueError):
+        return 100_000
+    if n <= 0:
+        return 10**9
+    return max(4_000, min(2_000_000, n))
+
+
+def parse_failure_log_preview(raw: str, *, max_chars: int | None = None) -> str:
+    """Сырой ответ для WARNING-логов; по умолчанию длинный лимит (см. parse_failure_max_chars)."""
+    if max_chars is None:
+        max_chars = parse_failure_max_chars()
     if not raw:
         return "<пусто>"
     s = raw.strip()
     if len(s) <= max_chars:
         return s
     edge = (max_chars - 36) // 2
-    return f"{s[:edge]}\n… [обрезано {len(s)} симв.] …\n{s[-edge:]}"
+    return f"{s[:edge]}\n… [обрезано {len(s)} симв., CT_AGENT_PARSE_FAILURE_LOG_MAX_CHARS] …\n{s[-edge:]}"
+
+
+def diagnose_protocol_parse_failure(raw: str | None) -> str:
+    """Текст для логов: почему ответ не распознан как протокол (типы, JSONDecodeError, кандидаты)."""
+    lines: list[str] = []
+    if raw is None:
+        return "content=None"
+    s = raw.strip()
+    if not s:
+        return "пустая строка после strip"
+    lines.append(f"длина={len(s)}")
+    try:
+        root = json.loads(s)
+        lines.append(f"json.loads(целиком): ok, тип корня={type(root).__name__}")
+        if isinstance(root, dict):
+            lines.append(f"  ключи верхнего уровня: {list(root.keys())[:24]}")
+            am = root.get("assistant_markdown")
+            cl = root.get("calls")
+            lines.append(f"  assistant_markdown: type={type(am).__name__} repr={repr(am)[:200]}")
+            lines.append(f"  calls: type={type(cl).__name__}")
+            norm = _normalize_protocol_dict(root)
+            lines.append(f"  _normalize_protocol_dict: {'OK' if norm else 'ОТКЛОНЁН'}")
+    except json.JSONDecodeError as e:
+        lines.append(f"json.loads(целиком): JSONDecodeError: {e}")
+
+    cands = _extract_protocol_json_candidates(s)
+    lines.append(f"кандидатов из _extract_protocol_json_candidates: {len(cands)}")
+    for i, blob in enumerate(cands[:6]):
+        try:
+            json.loads(blob)
+        except json.JSONDecodeError as e:
+            lines.append(f"  [{i}] len={len(blob)}: JSONDecodeError {e}")
+            continue
+        pb = _parse_protocol_blob(blob)
+        lines.append(f"  [{i}] len={len(blob)}: json ok, parse_blob={'OK' if pb else 'ОТКЛОНЁН'}")
+
+    lenient = _lenient_protocol_payloads(s)
+    lines.append(f"_lenient_protocol_payloads: распознано объектов: {len(lenient)}")
+    return "\n".join(lines)
 
 
 def parse_agent_response(raw: str) -> dict[str, Any] | None:
@@ -339,7 +407,15 @@ def parse_agent_response(raw: str) -> dict[str, Any] | None:
     Берём первый объект с непустым `calls` (нужно выполнить тулы). Если таких нет — последний
     валидный объект (итог раунда). Так модель может ошибочно вставить несколько JSON в одно сообщение.
     """
-    payloads = iter_parsed_protocol_payloads_any(raw)
+    s = (raw or "").replace("\ufeff", "").strip()
+    payloads: list[dict[str, Any]] = []
+    # Сначала целиком (частый случай: один объект без преамбулы; BOM уже снят)
+    if s.startswith("{") and s.endswith("}"):
+        direct = _parse_protocol_blob(s)
+        if direct is not None:
+            payloads = [direct]
+    if not payloads:
+        payloads = iter_parsed_protocol_payloads_any(s)
     if not payloads:
         return None
     for p in payloads:

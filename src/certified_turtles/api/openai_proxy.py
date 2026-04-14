@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
+import os
 import time
 import uuid
 from typing import Any
@@ -23,6 +25,7 @@ from certified_turtles.model_mode import (
     should_merge_virtual_models_into_list,
 )
 from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
+from certified_turtles.services.message_normalize import normalize_chat_messages
 
 router = APIRouter(tags=["openai-proxy"])
 _proxy_log = agent_logger("openai_proxy")
@@ -46,6 +49,102 @@ def _service() -> LLMService:
         return LLMService.from_env()
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+def _mws_image_chat_model_ids() -> set[str]:
+    """Модели MWS, у которых генерация картинок только через /v1/images/generations (chat/completions → 404)."""
+    raw = (os.environ.get("CT_MWS_IMAGE_CHAT_MODELS") or "qwen-image,qwen-image-lightning").strip()
+    return {x.strip() for x in raw.split(",") if x.strip()}
+
+
+def _is_mws_image_chat_model(model: str) -> bool:
+    return model.strip() in _mws_image_chat_model_ids()
+
+
+def _last_user_prompt_for_image(messages: list[dict[str, Any]]) -> str:
+    for m in reversed(messages):
+        if isinstance(m, dict) and m.get("role") == "user":
+            return message_text_content(m).strip()
+    return ""
+
+
+def _chat_completion_from_mws_images(model: str, img: Any) -> dict[str, Any]:
+    """Собирает chat.completion с markdown-картинкой для Open WebUI."""
+    if not isinstance(img, dict):
+        raise ValueError("Ответ images/generations не JSON-объект")
+    data = img.get("data")
+    if not isinstance(data, list) or not data:
+        raise ValueError("В ответе images нет data[]")
+    first = data[0] if isinstance(data[0], dict) else {}
+    url = first.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("В ответе images нет url")
+    alt = first.get("revised_prompt")
+    if not isinstance(alt, str) or not alt.strip():
+        alt = "image"
+    content = f"![{alt}]({url})\n"
+    return {
+        "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+
+async def _chat_completions_mws_image_model(
+    svc: LLMService,
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    stream: bool,
+    body: dict[str, Any],
+) -> Any:
+    """Обход 404: qwen-image в MWS не поддерживает chat/completions, только images/generations."""
+    msgs = normalize_chat_messages(copy.deepcopy(messages))
+    prompt = _last_user_prompt_for_image(msgs)
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail="Нужен непустой текст пользователя (промпт) для генерации изображения.",
+        )
+    payload: dict[str, Any] = {"model": model, "prompt": prompt, "n": 1}
+    size = body.get("size")
+    if isinstance(size, str) and size.strip():
+        payload["size"] = size.strip()
+    else:
+        payload["size"] = "1024x1024"
+    for key in ("quality", "response_format", "style"):
+        v = body.get(key)
+        if isinstance(v, str) and v.strip():
+            payload[key] = v.strip()
+    try:
+        img = await asyncio.to_thread(svc.images_generations, payload)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+    try:
+        completion = _chat_completion_from_mws_images(model, img)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    completion = _completion_with_visible_markdown(completion)
+    _proxy_log.debug(
+        "mws image chat completion model=%s stream=%s preview=\n%s",
+        model,
+        stream,
+        debug_clip(_final_assistant_content(completion)),
+    )
+    if not stream:
+        return completion
+    return StreamingResponse(_sse_stream(model, completion), media_type="text/event-stream")
 
 
 @router.get("/v1/models")
@@ -146,6 +245,41 @@ async def audio_transcriptions_plain_prefix(
     return await _audio_transcriptions_impl(file, model, language, prompt, response_format)
 
 
+async def _images_generations_from_body(body: dict[str, Any]) -> Any:
+    svc = _service()
+    try:
+        return await asyncio.to_thread(svc.images_generations, body)
+    except MWSGPTError as e:
+        raise HTTPException(
+            status_code=http_status_for_mws_error(e),
+            detail={"message": str(e), "status": e.status, "body": e.body},
+        ) from e
+
+
+@router.post("/v1/images/generations")
+async def images_generations(request: Request) -> Any:
+    """Прокси на MWS POST /v1/images/generations (модели qwen-image и др.)."""
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    return await _images_generations_from_body(body)
+
+
+@router.post("/v1/plain/images/generations")
+async def images_generations_plain_prefix(request: Request) -> Any:
+    """То же при base URL …/v1/plain."""
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Ожидается JSON: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Ожидается JSON-объект")
+    return await _images_generations_from_body(body)
+
+
 def _completion_with_visible_markdown(completion: dict[str, Any]) -> dict[str, Any]:
     """Убирает обёртку JSON-протокола и служебные поля message — Open WebUI показывает markdown."""
     choices = completion.get("choices")
@@ -204,6 +338,132 @@ def _sse_stream(model: str, completion: dict[str, Any]):
         yield _line({"content": piece}, None)
     yield _line({}, "stop")
     yield "data: [DONE]\n\n"
+
+
+def _iter_text_chunks(text: str, *, size: int = _SSE_CONTENT_CHUNK_CHARS):
+    for i in range(0, len(text), size):
+        yield text[i : i + size]
+
+
+def _sse_line(
+    model: str,
+    cid: str,
+    created: int,
+    delta: dict[str, Any],
+    finish_reason: str | None,
+    *,
+    extra: dict[str, Any] | None = None,
+) -> str:
+    payload = {
+        "id": cid,
+        "object": "chat.completion.chunk",
+        "created": created,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "delta": delta,
+                "finish_reason": finish_reason,
+            }
+        ],
+    }
+    if extra:
+        payload.update(extra)
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _agent_sse_stream(
+    svc: LLMService,
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    max_tool_rounds: int,
+    extra: dict[str, Any],
+):
+    cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+    created = int(time.time())
+    cumulative_output: list[dict[str, Any]] = []
+    yield _sse_line(model, cid, created, {"role": "assistant"}, None)
+    try:
+        for event in svc.stream_agent(model, messages, max_tool_rounds=max_tool_rounds, **extra):
+            etype = event.get("type")
+            if etype == "done":
+                result = event.get("result") if isinstance(event.get("result"), dict) else {}
+                final_output = result.get("output") if isinstance(result.get("output"), list) else cumulative_output
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {},
+                    "stop",
+                    extra={"done": True, "output": final_output},
+                )
+                yield "data: [DONE]\n\n"
+                return
+            if etype == "reasoning_stream":
+                text = str(event.get("text") or "")
+                if not text.strip():
+                    continue
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {"reasoning": text, "ct_phase": "reasoning"},
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": "reasoning_stream"},
+                )
+                continue
+            if etype == "content_stream":
+                text = str(event.get("text") or "")
+                if not text.strip():
+                    continue
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    {"content": text, "ct_phase": "final"},
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": "content_stream"},
+                )
+                continue
+            if etype not in ("reasoning", "status", "final"):
+                continue
+            text = str(event.get("text") or "")
+            if not text.strip():
+                continue
+            cumulative_output.append(copy.deepcopy(event))
+            rendered = text if etype != "status" else text.strip()
+            for piece in _iter_text_chunks(rendered):
+                delta: dict[str, Any] = {"ct_phase": etype}
+                if etype == "reasoning":
+                    delta["reasoning"] = piece
+                elif etype == "status":
+                    delta["tool_status"] = piece
+                elif etype == "final":
+                    delta["content"] = piece
+                    delta["final"] = piece
+                yield _sse_line(
+                    model,
+                    cid,
+                    created,
+                    delta,
+                    None,
+                    extra={"output": cumulative_output, "ct_phase": etype},
+                )
+    except (MWSGPTError, ValueError) as e:
+        err = f"\n\n[Ошибка агента: {e}]"
+        for piece in _iter_text_chunks(err):
+            yield _sse_line(
+                model,
+                cid,
+                created,
+                {"content": piece, "ct_phase": "error", "error": str(e)},
+                None,
+                extra={"output": cumulative_output, "ct_phase": "error"},
+            )
+        yield _sse_line(model, cid, created, {}, "stop")
+        yield "data: [DONE]\n\n"
+        return
 
 
 def _wants_plain_chat(body: dict[str, Any]) -> bool:
@@ -277,6 +537,12 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     extra = {k: v for k, v in body.items() if k not in _PASS_THROUGH_IGNORE}
 
     svc = _service()
+    # MWS: qwen-image в /v1/models есть, но chat/completions для этих моделей → 404; генерация только images/generations.
+    if _is_mws_image_chat_model(model):
+        return await _chat_completions_mws_image_model(
+            svc, model, messages, stream=stream, body=body
+        )
+
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
     plain = force_plain or _wants_plain_chat(body) or ow_meta_plain or ow_tool_router_plain
@@ -288,8 +554,15 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         messages = prepared.messages
         if prepared.max_tool_rounds_override is not None:
             max_tool_rounds = max(max_tool_rounds, prepared.max_tool_rounds_override)
+        if prepared.forced_agent_id:
+            extra["forced_agent_id"] = prepared.forced_agent_id
         if prepared.mode_applied:
-            _proxy_log.debug("ct_mode applied=%s max_tool_rounds=%s", prepared.mode_applied, max_tool_rounds)
+            _proxy_log.debug(
+                "ct_mode applied=%s forced_agent_id=%s max_tool_rounds=%s",
+                prepared.mode_applied,
+                prepared.forced_agent_id,
+                max_tool_rounds,
+            )
     if ow_meta_plain and not force_plain and not _wants_plain_chat(body):
         _proxy_log.debug("openwebui auxiliary ### Task -> plain chat (no agent JSON protocol)")
     if ow_tool_router_plain and not force_plain and not _wants_plain_chat(body):
@@ -303,6 +576,18 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         sorted(extra.keys()),
         summarize_messages(messages, preview=400) if isinstance(messages, list) else str(type(messages)),
     )
+    if stream and not plain:
+        return StreamingResponse(
+            _agent_sse_stream(
+                svc,
+                model,
+                messages,
+                max_tool_rounds=max_tool_rounds,
+                extra=extra,
+            ),
+            media_type="text/event-stream",
+        )
+
     try:
         if plain:
             completion = await asyncio.to_thread(svc.chat_plain, model, messages, **extra)

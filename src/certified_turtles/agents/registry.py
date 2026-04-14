@@ -28,6 +28,7 @@ WRITER_AGENT_ID = "writer"
 DEEP_RESEARCH_AGENT_ID = "deep_research"
 CODER_AGENT_ID = "coder"
 DATA_ANALYST_AGENT_ID = "data_analyst"
+PRESENTATION_AGENT_ID = "presentation"
 
 SUB_AGENTS: dict[str, SubAgentSpec] = {
     RESEARCH_AGENT_ID: SubAgentSpec(
@@ -47,9 +48,9 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
     DEEP_RESEARCH_AGENT_ID: SubAgentSpec(
         id=DEEP_RESEARCH_AGENT_ID,
         system_prompt=load_prompt("subagents/deep_research.md").strip(),
-        tool_names=("web_search", "fetch_url"),
-        max_inner_rounds=24,
-        blurb="Многошаговое исследование: много поисков, fetch_url, валидация, подробный отчёт.",
+        tool_names=(),
+        max_inner_rounds=1,
+        blurb="Отчёт через GPT Researcher (assafelovic/gpt-researcher), отдельный venv.",
     ),
     CODER_AGENT_ID: SubAgentSpec(
         id=CODER_AGENT_ID,
@@ -64,6 +65,13 @@ SUB_AGENTS: dict[str, SubAgentSpec] = {
         tool_names=("workspace_file_path", "execute_python", "read_workspace_file"),
         max_inner_rounds=14,
         blurb="CSV/XLSX: путь к файлу + Python, результат в stdout/артефактах.",
+    ),
+    PRESENTATION_AGENT_ID: SubAgentSpec(
+        id=PRESENTATION_AGENT_ID,
+        system_prompt=load_prompt("subagents/presentation.md").strip(),
+        tool_names=("web_search", "fetch_url", "generate_presentation"),
+        max_inner_rounds=10,
+        blurb="Создание .pptx: исследование темы + генерация презентации.",
     ),
 }
 

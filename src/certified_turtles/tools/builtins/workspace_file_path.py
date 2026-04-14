@@ -31,6 +31,13 @@ def resolve_workspace_upload_file(file_id: str) -> tuple[str, Path] | None:
     if name != raw or ".." in raw or "/" in raw or "\\" in raw:
         return None
     path = uploads_dir() / name
+    # Extra guard: resolved path must stay within uploads_dir
+    try:
+        resolved = path.resolve(strict=False)
+        if not str(resolved).startswith(str(uploads_dir().resolve())):
+            return None
+    except (OSError, ValueError):
+        return None
     if not path.is_file():
         return None
     return name, path

@@ -1,6 +1,7 @@
 .git
 .github
 .venv
+.venv-gpt-researcher
 __pycache__
 *.py[cod]
 *.egg-info

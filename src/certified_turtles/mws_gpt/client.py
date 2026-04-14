@@ -7,6 +7,7 @@ import socket
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from typing import Any
 
 import requests
@@ -152,6 +153,63 @@ class MWSGPTClient:
         _mws_log.debug("POST /v1/chat/completions response preview=\n%s", debug_clip(json.dumps(out, ensure_ascii=False)))
         return out
 
+    def chat_completions_stream(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        **extra: Any,
+    ) -> Iterator[dict[str, Any]]:
+        """POST /v1/chat/completions с stream: true, разбор SSE `data: {...}` / `[DONE]`."""
+        body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
+        body.update(extra)
+        url = f"{self._base}/v1/chat/completions"
+        headers = self._headers(json_body=True)
+        try:
+            timeout_sec = int(os.environ.get("MWS_HTTP_TIMEOUT_SEC", "120"))
+        except (TypeError, ValueError):
+            timeout_sec = 120
+        timeout_sec = max(30, min(600, timeout_sec))
+        _mws_log.debug(
+            "POST /v1/chat/completions (stream) model=%s messages=%s extra_keys=%s",
+            model,
+            len(messages),
+            sorted(extra.keys()),
+        )
+        try:
+            r = requests.post(url, headers=headers, json=body, timeout=timeout_sec, stream=True)
+        except requests.RequestException as e:
+            raise MWSGPTError(
+                f"Сеть при POST /v1/chat/completions (stream): {e!s}",
+                status=502,
+                body=str(e),
+            ) from e
+        try:
+            if r.status_code >= 400:
+                err_body = r.text[:8000] if r.text else ""
+                raise MWSGPTError(
+                    f"Ошибка MWS chat/completions (stream): HTTP {r.status_code}",
+                    status=r.status_code,
+                    body=err_body,
+                )
+            for line in r.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                if isinstance(line, bytes):
+                    line = line.decode("utf-8", errors="replace")
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj, dict):
+                    yield obj
+        finally:
+            r.close()
+
     def completions(self, model: str, prompt: str, **extra: Any) -> Any:
         body: dict[str, Any] = {"model": model, "prompt": prompt}
         body.update(extra)
@@ -161,6 +219,10 @@ class MWSGPTClient:
         body: dict[str, Any] = {"model": model, "input": input_text}
         body.update(extra)
         return self._request("POST", "/v1/embeddings", payload=body)
+
+    def images_generations(self, payload: dict[str, Any]) -> Any:
+        """POST /v1/images/generations (OpenAI-совместимо). У MWS модели `qwen-image` работают здесь, а не в chat/completions."""
+        return self._request("POST", "/v1/images/generations", payload=payload)
 
     def audio_transcriptions(
         self,

@@ -60,7 +60,7 @@ def test_clamp_agent_tool_rounds():
     assert clamp_agent_tool_rounds(15.7) == 15
 
 
-def test_run_agent_json_protocol_no_openai_tools_kwarg(monkeypatch):
+def test_run_agent_passes_openai_tools_kwarg(monkeypatch):
     monkeypatch.setattr(
         "certified_turtles.agents.loop.run_primitive_tool",
         lambda name, args: "MOCK",
@@ -69,9 +69,19 @@ def test_run_agent_json_protocol_no_openai_tools_kwarg(monkeypatch):
     fake = FakeClient(final)
     svc = LLMService(fake)  # type: ignore[arg-type]
     out = svc.run_agent("mws-gpt-alpha", [{"role": "user", "content": "hi"}], max_tool_rounds=1)
-    assert out["completion"]["choices"][0]["message"]["content"] == "done"
+    assert "done" in out["completion"]["choices"][0]["message"]["content"]
     kwargs = fake.calls[0]["kwargs"]
-    assert "tools" not in kwargs
+    assert "tools" in kwargs
+    assert "tool_choice" in kwargs
+
+
+def test_stream_agent_emits_done():
+    fake = FakeClient({"choices": [{"message": {"role": "assistant", "content": "ok"}}]})
+    svc = LLMService(fake)  # type: ignore[arg-type]
+    events = list(svc.stream_agent("m", [{"role": "user", "content": "x"}], max_tool_rounds=1))
+    assert events
+    assert events[-1]["type"] == "done"
+    assert "ok" in events[-1]["result"]["completion"]["choices"][0]["message"]["content"]
 
 
 def test_run_agent_clamps_rounds_before_loop(monkeypatch):

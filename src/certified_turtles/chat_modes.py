@@ -31,15 +31,19 @@ _MODE_ALIASES: dict[str, str] = {
     "analyst": "data_analyst",
     "writer": "writer",
     "text": "writer",
+    "presentation": "presentation",
+    "pptx": "presentation",
+    "slides": "presentation",
 }
 
 _MODE_MAX_ROUNDS: dict[str, int] = {
     "default": 0,  # 0 = не менять тело запроса
-    "deep_research": 28,
+    "deep_research": 36,
     "research": 14,
     "coder": 16,
     "data_analyst": 18,
     "writer": 10,
+    "presentation": 14,
 }
 
 _PREFIX_RE = re.compile(
@@ -59,6 +63,9 @@ class PreparedChatRequest:
     mode_applied: str | None
     """Какой режим применён (canonical id) или None."""
 
+    forced_agent_id: str | None
+    """Если задано — вместо общего родительского цикла сразу запускать этого под-агента."""
+
 
 def _canonical_mode(raw: str | None) -> str | None:
     if raw is None:
@@ -73,6 +80,12 @@ def _mode_prompt_path(mode: str) -> str | None:
     if mode == "default" or mode not in _MODE_MAX_ROUNDS:
         return None
     return f"modes/{mode}.md"
+
+
+def _mode_forced_agent_id(mode: str | None) -> str | None:
+    if mode in {"research", "deep_research", "presentation"}:
+        return mode
+    return None
 
 
 def _inject_mode_system(messages: list[dict[str, Any]], text: str) -> None:
@@ -117,7 +130,12 @@ def prepare_chat_request(
     out = copy.deepcopy(messages)
     if not for_agent:
         _strip_prefix_from_last_user(out)
-        return PreparedChatRequest(messages=out, max_tool_rounds_override=None, mode_applied=None)
+        return PreparedChatRequest(
+            messages=out,
+            max_tool_rounds_override=None,
+            mode_applied=None,
+            forced_agent_id=None,
+        )
 
     mode_raw: str | None = None
     if isinstance(body.get("ct_mode"), str) and body["ct_mode"].strip():
@@ -132,16 +150,31 @@ def prepare_chat_request(
         mode = "default"
 
     if not mode or mode == "default":
-        return PreparedChatRequest(messages=out, max_tool_rounds_override=None, mode_applied=None)
+        return PreparedChatRequest(
+            messages=out,
+            max_tool_rounds_override=None,
+            mode_applied=None,
+            forced_agent_id=None,
+        )
 
     path = _mode_prompt_path(mode)
     if not path:
-        return PreparedChatRequest(messages=out, max_tool_rounds_override=None, mode_applied=None)
+        return PreparedChatRequest(
+            messages=out,
+            max_tool_rounds_override=None,
+            mode_applied=None,
+            forced_agent_id=None,
+        )
 
     try:
         text = load_prompt(path).strip()
     except OSError:
-        return PreparedChatRequest(messages=out, max_tool_rounds_override=None, mode_applied=None)
+        return PreparedChatRequest(
+            messages=out,
+            max_tool_rounds_override=None,
+            mode_applied=None,
+            forced_agent_id=None,
+        )
 
     if text:
         _inject_mode_system(out, text)
@@ -152,6 +185,7 @@ def prepare_chat_request(
         messages=out,
         max_tool_rounds_override=max_override,
         mode_applied=mode,
+        forced_agent_id=_mode_forced_agent_id(mode),
     )
 
 

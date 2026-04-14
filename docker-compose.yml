@@ -25,9 +25,13 @@ services:
       PYTHONUNBUFFERED: "1"
       MWS_API_KEY: ${MWS_API_KEY:-}
       MWS_API_BASE: ${MWS_API_BASE:-https://api.gpt.mws.ru}
+      # ASR: id модели в MWS (см. GET /v1/models); whisper-1 на MWS может отсутствовать.
+      CT_ASR_MODEL: ${CT_ASR_MODEL:-whisper-medium}
       GENERATED_FILES_DIR: /data/generated
       UPLOADS_DIR: /data/generated/uploads
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      # Интерпретатор из образа (Dockerfile); локально без Docker — .venv-gpt-researcher или GPT_RESEARCHER_PYTHON
+      GPT_RESEARCHER_PYTHON: ${GPT_RESEARCHER_PYTHON:-/opt/gpt-researcher-venv/bin/python}
       # Подробный трейс агента на stderr: [agent-debug] … Смотреть: docker compose logs -f api
       # Выключить шум: CT_AGENT_DEBUG=0 в .env
       CT_AGENT_DEBUG: ${CT_AGENT_DEBUG:-1}
@@ -48,8 +52,8 @@ services:
       dockerfile: Dockerfile
       args:
         # Стабильный кеш: одно и то же значение при `docker compose build` без лишних --build-arg.
-        # Переопределение: NODE_HEAP_MB=4096 в .env или docker compose build --build-arg NODE_HEAP_MB=4096
-        NODE_HEAP_MB: ${NODE_HEAP_MB:-6144}
+        # На 8 ГБ RAM хоста дефолт 3072; при «heap out of memory» (не SIGKILL) подними, напр. 4096.
+        NODE_HEAP_MB: ${NODE_HEAP_MB:-3072}
         # Не качает sentence-transformers/whisper в слое pip при сборке — меньше диска и времени (RAG при первом use).
         USE_SLIM: "${OPEN_WEBUI_USE_SLIM:-true}"
     image: certified-turtles-open-webui:local
@@ -72,10 +76,9 @@ services:
       # Deep Research без раздувания списка моделей: второе подключение Open WebUI с
       # OPENAI_API_BASE_URL: http://api:8000/v1/m/deep_research (см. prompts/openwebui_modes.md).
       OPENAI_API_BASE_URL: http://api:8000/v1
-      # Голос: по умолчанию Web Speech API в браузере. Серверный ASR — тот же API base + /v1/audio/transcriptions (прокси на MWS):
-      #   AUDIO_STT_ENGINE: "openai"
-      # Модель Whisper: CT_ASR_MODEL в сервисе api (по умолчанию whisper-1).
-      AUDIO_STT_ENGINE: "web"
+      # Голос: Web STT блокирует «режим звонка» в UI ($config.audio.stt.engine === 'web').
+      # Серверный ASR: тот же OPENAI_API_BASE_URL + /v1/audio/transcriptions (прокси api → MWS).
+      AUDIO_STT_ENGINE: "openai"
       AUDIO_TTS_ENGINE: "web"
       ENABLE_AUDIO_CONVERSATION: "True"
       # Все модели из ответа MWS /v1/models видны в селекторе; без ограничений «workspace».

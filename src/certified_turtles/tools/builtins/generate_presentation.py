@@ -52,6 +52,12 @@ def _default_image_caption(title: str, image_url: str | None) -> str:
 
 
 def _normalize_slide(idx: int, raw: Any) -> Slide | dict[str, str]:
+    # Модель иногда передаёт slide как JSON-строку — десериализуем.
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
     if not isinstance(raw, dict):
         return {"error": f"slides[{idx}] должен быть объектом с title/bullets"}
     title = raw.get("title")
@@ -108,6 +114,13 @@ def _handle_generate_presentation(arguments: dict[str, Any]) -> str:
         return json.dumps({"error": f"subtitle слишком длинный (макс {_MAX_SUBTITLE_LEN})."}, ensure_ascii=False)
 
     slides_raw = arguments.get("slides")
+    # Модель иногда передаёт slides как JSON-строку вместо массива — десериализуем.
+    if isinstance(slides_raw, str):
+        slides_raw = slides_raw.strip()
+        try:
+            slides_raw = json.loads(slides_raw)
+        except json.JSONDecodeError:
+            pass
     if not isinstance(slides_raw, list) or not slides_raw:
         return json.dumps(
             {"error": "slides должен быть непустым списком объектов {title, bullets}."},

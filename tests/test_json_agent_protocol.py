@@ -4,6 +4,7 @@ import json
 
 from certified_turtles.agents.json_agent_protocol import (
     PROTOCOL_USER_PREFIX,
+    diagnose_protocol_parse_failure,
     extract_user_visible_assistant_text,
     parse_agent_response,
     patch_completion_assistant_markdown,
@@ -17,6 +18,32 @@ def test_parse_valid_minimal():
     assert p is not None
     assert p["assistant_markdown"] == "hi"
     assert p["calls"] == []
+
+
+def test_parse_null_assistant_markdown_and_calls_coerced():
+    s = '{"assistant_markdown":null,"calls":null}'
+    p = parse_agent_response(s)
+    assert p is not None
+    assert p["assistant_markdown"] == ""
+    assert p["calls"] == []
+
+
+def test_parse_null_with_execute_python():
+    s = (
+        '{"assistant_markdown":null,"calls":['
+        '{"name":"execute_python","arguments":{"code":"print(1)"}}]}'
+    )
+    p = parse_agent_response(s)
+    assert p is not None
+    assert p["assistant_markdown"] == ""
+    assert p["calls"][0]["name"] == "execute_python"
+
+
+def test_diagnose_protocol_parse_failure_includes_keys():
+    s = '{"assistant_markdown":"x","calls":[]}'
+    d = diagnose_protocol_parse_failure(s)
+    assert "json.loads(целиком): ok" in d
+    assert "ключи верхнего уровня" in d
 
 
 def test_parse_lenient_second_object_in_stream():

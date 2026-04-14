@@ -38,11 +38,11 @@ def test_parent_tools_expose_all():
     assert f"agent_{CODER_AGENT_ID}" in tool_names
 
 
-def test_deep_research_subagent_has_research_tools():
+def test_deep_research_subagent_uses_gpt_researcher_not_tool_loop():
     spec = get_subagent(DEEP_RESEARCH_AGENT_ID)
     assert spec is not None
-    assert "web_search" in spec.tool_names
-    assert "fetch_url" in spec.tool_names
+    assert spec.tool_names == ()
+    assert spec.max_inner_rounds == 1
 
 
 def test_coder_subagent_has_python_tools():

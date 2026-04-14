@@ -41,6 +41,7 @@ google = [
     "google-api-python-client>=2.160.0",
     "google-auth>=2.35.0",
 ]
+# Изолированный venv: см. externals/requirements-gpt-researcher.txt и scripts/bootstrap_gpt_researcher_venv.sh
 
 [tool.uv]
 package = true

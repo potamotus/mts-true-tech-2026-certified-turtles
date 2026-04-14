@@ -93,7 +93,7 @@ Architecture:
 
 1. Скопируйте `.env.example` → `.env`, укажите `MWS_API_KEY` (и при желании `WEBUI_SECRET_KEY`).
 2. Запуск: `docker compose up --build`
-3. UI: [http://localhost:3000](http://localhost:3000) (порт задаётся `OPEN_WEBUI_PORT`).
+3. UI: [http://localhost:3000](http://localhost:3000) (порт задаётся `OPEN_WEBUI_PORT`). В форке под строкой ввода — **переключатели режимов GPTHub** (Deep Research, Web, Слайды, Код, Данные, Текст): в тело запроса добавляется `ct_mode` для бэкенда. Дорожная карта и риски: `docs/gpthub-cloud-code-spec.md`.
 4. **Модели:** список подтягивается через наш FastAPI (`GET /v1/models` → MWS). В шапке чата выберите модель **вручную** (автовыбор — отдельная задача).
 5. **Архитектура:** Open WebUI → FastAPI-прокси (`api` в compose) → MWS GPT. По умолчанию `OPENAI_API_BASE_URL=http://api:8000/v1` — чат идёт через **агентский** JSON-цикл с тулами. **Обычный чат без тулов:** заведите второе подключение OpenAI в WebUI с тем же ключом и **`OPENAI_API_BASE_URL=http://api:8000/v1/plain`** (эндпоинты `…/v1/plain/models` и `…/v1/plain/chat/completions` зеркалят OpenAI-контракт без агента). Либо в одном подключении в теле запроса передавайте **`"use_agent": false`** (если клиент умеет доп. поля JSON).
 6. **Логи агента (этапы, тулы, под-агенты):** в WebUI ответ появляется только после завершения цикла на сервере; «живой» прогресс смотрите в терминале: `docker compose logs -f api`. По умолчанию включено **`CT_AGENT_DEBUG=1`** и **`PYTHONUNBUFFERED=1`** — в логах строки `[agent-debug] …` (раунды, вызовы MWS, `execute_python`, `subagent start/end …`). Объём обрезки задаётся `CT_AGENT_DEBUG_MAX_CHARS`. Режима *human-in-the-loop* (пауза на ввод человека) в стеке нет — долгая «точка» в чате обычно означает долгий LLM/тул-цикл или сеть.

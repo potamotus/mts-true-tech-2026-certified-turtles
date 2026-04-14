@@ -38,6 +38,8 @@ def _should_log_backend_request(method: str, path: str) -> bool:
         "/v1/plain/chat/completions",
         "/v1/audio/transcriptions",
         "/v1/plain/audio/transcriptions",
+        "/v1/images/generations",
+        "/v1/plain/images/generations",
     ):
         return method == "POST"
     if method == "POST" and path.startswith("/v1/m/") and path.endswith("/chat/completions"):
@@ -159,7 +161,7 @@ def health() -> dict[str, Any]:
             "google_docs": google_docs_capability_dict(),
             "voice_chat": {
                 "open_webui": True,
-                "hint": "Голосовой режим в Open WebUI: AUDIO_STT_ENGINE / AUDIO_TTS_ENGINE (см. docker-compose).",
+                "hint": "Режим звонка в UI требует AUDIO_STT_ENGINE=openai (не web) и тот же OPENAI_API_BASE_URL, что и чат; ASR: прокси /v1/audio/transcriptions, CT_ASR_MODEL.",
             },
             "audio_asr": {
                 "proxy": "/v1/audio/transcriptions",
@@ -171,9 +173,17 @@ def health() -> dict[str, Any]:
                 "multimodal_messages": True,
                 "hint": "Части image_url уходят в MWS; выберите модель с поддержкой зрения.",
             },
+            "image_generation": {
+                "proxy": "/v1/images/generations",
+                "chat_completions_bridge": (
+                    "Модели из CT_MWS_IMAGE_CHAT_MODELS (по умолчанию qwen-image, qwen-image-lightning) "
+                    "в MWS не поддерживают chat/completions — фасад вызывает images/generations и отдаёт markdown."
+                ),
+            },
             "deep_research": {
                 "subagent": "deep_research",
                 "tool": "agent_deep_research",
+                "engine": "GPT Researcher — https://github.com/assafelovic/gpt-researcher (venv: scripts/bootstrap_gpt_researcher_venv.sh)",
             },
             "chat_modes": {
                 "recommended_open_webui_base": "http://<api>:8000/v1/m/deep_research — отдельное подключение, список моделей без размножения (переключатель в сайдбаре).",
