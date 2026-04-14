@@ -20,7 +20,7 @@
 		<Tooltip content="Home" placement="right">
 			<button
 				aria-label="Home"
-				class=" cursor-pointer {selected === 'home' ? 'rounded-2xl' : 'rounded-full'}"
+				class=" cursor-pointer rounded-xl"
 				on:click={() => {
 					selected = 'home';
 
@@ -31,7 +31,7 @@
 			>
 				<img
 					src="{WEBUI_BASE_URL}/static/splash.png"
-					class="size-11 dark:invert p-0.5"
+					class="size-11 p-0.5 rounded-none"
 					alt="logo"
 					draggable="false"
 				/>

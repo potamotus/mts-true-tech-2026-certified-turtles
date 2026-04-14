@@ -265,6 +265,8 @@
 		}
 	};
 
+	let _modelsInitialized = false;
+
 	$: if (selectedModels && chatIdProp !== '') {
 		saveSessionSelectedModels();
 	}
@@ -279,7 +281,11 @@
 			return;
 		}
 		sessionStorage.selectedModels = selectedModelsString;
-		console.log('saveSessionSelectedModels', selectedModels, sessionStorage.selectedModels);
+		// Only save to localStorage after initial load (user-initiated change)
+		if (_modelsInitialized) {
+			localStorage.setItem('lastSelectedModels', selectedModelsString);
+		}
+		_modelsInitialized = true;
 	};
 
 	let oldSelectedModelIds = [''];
@@ -1028,6 +1034,9 @@
 					// Set from session storage (temporary selection)
 					selectedModels = JSON.parse(sessionStorage.selectedModels);
 					sessionStorage.removeItem('selectedModels');
+				} else if (localStorage.getItem('lastSelectedModels')) {
+					// Set from last used model
+					selectedModels = JSON.parse(localStorage.getItem('lastSelectedModels'));
 				} else {
 					if ($settings?.models) {
 						// Set from user settings

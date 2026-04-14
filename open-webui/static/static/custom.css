@@ -1,0 +1,380 @@
+/* ==========================================================
+   MTS Design System theme for Open WebUI
+   Based on MTS Design System identity (2024)
+   Supports both light and dark modes
+   ========================================================== */
+
+/* --- Global MTS tokens --- */
+:root {
+  --mts-red: #ff0032;
+  --mts-red-hover: #e0002d;
+  --mts-red-active: #c40027;
+}
+
+/* ======================
+   LIGHT MODE
+   ====================== */
+
+:root.light {
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f0f0f0;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #cccccc;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #7a7a7a;
+  --color-gray-600: #555555;
+  --color-gray-700: #404040;
+  --color-gray-800: #2c2c2c;
+  --color-gray-850: #1f1f1f;
+  --color-gray-900: #141414;
+  --color-gray-950: #0a0a0a;
+
+  --mts-surface: #f5f5f5;
+  --mts-surface-elevated: #ffffff;
+  --mts-border: #e0e0e0;
+  --mts-text-primary: #1d2023;
+  --mts-text-secondary: #6b7280;
+}
+
+.light body {
+  background: #ffffff !important;
+  color: #1d2023;
+}
+
+.light #sidebar {
+  background: #f5f5f5 !important;
+}
+
+/* Primary Buttons */
+.light button.bg-black,
+.light button.bg-gray-900 {
+  background: var(--mts-red) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  border: none !important;
+  transition: background 0.15s ease;
+}
+
+.light button.bg-black:hover,
+.light button.bg-gray-900:hover {
+  background: var(--mts-red-hover) !important;
+}
+
+.light button.bg-black:active,
+.light button.bg-gray-900:active {
+  background: var(--mts-red-active) !important;
+}
+
+/* Send button */
+.light button[aria-label="Send message"],
+.light button[id="send-message-button"] {
+  background: var(--mts-red) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+.light button[aria-label="Send message"]:hover,
+.light button[id="send-message-button"]:hover {
+  background: var(--mts-red-hover) !important;
+}
+
+/* Input fields */
+.light input[type="text"],
+.light input[type="search"],
+.light input[type="email"],
+.light input[type="password"],
+.light input[type="number"],
+.light input[type="url"],
+.light textarea,
+.light select {
+  background: #ffffff !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 12px !important;
+  color: var(--mts-text-primary) !important;
+  transition: border-color 0.15s ease;
+}
+
+.light input:focus,
+.light textarea:focus,
+.light select:focus {
+  border-color: var(--mts-red) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--mts-red) !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: var(--mts-text-secondary) !important;
+}
+
+/* Chat input */
+.light #chat-input-container {
+  padding-left: 0.75rem !important;
+}
+
+.light #chat-input {
+  padding-left: 0.5rem !important;
+}
+
+.light #chat-input .tiptap,
+.light #chat-input [contenteditable] {
+  padding-left: 0.5rem !important;
+}
+
+.light #chat-input .is-editor-empty::before {
+  padding-left: 0.5rem !important;
+}
+
+/* Selection */
+.light ::selection {
+  background: rgba(255, 0, 50, 0.15);
+  color: #1d2023;
+}
+
+/* Search input */
+input[type="search"],
+[class*="search"] input,
+#sidebar input,
+#search-input,
+#chat-search,
+#chat-search input {
+  border-radius: 12px !important;
+}
+
+#chat-search:focus-within {
+  border-color: var(--mts-red) !important;
+  box-shadow: 0 0 0 1px var(--mts-red) !important;
+  border-radius: 12px !important;
+}
+
+#chat-search input:focus {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Links */
+.light a:not([class]) {
+  color: var(--mts-red);
+}
+
+.light a:not([class]):hover {
+  color: var(--mts-red-hover);
+}
+
+/* Scrollbar */
+.light ::-webkit-scrollbar-thumb {
+  background: #cccccc !important;
+  border-radius: 8px !important;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ======================
+   DARK MODE
+   ====================== */
+
+:root.dark {
+  --color-gray-50: #e8e8e8;
+  --color-gray-100: #d0d0d0;
+  --color-gray-200: #ababab;
+  --color-gray-300: #8a8a8a;
+  --color-gray-400: #6b6b6b;
+  --color-gray-500: #555555;
+  --color-gray-600: #3b3b3b;
+  --color-gray-700: #2c2c2c;
+  --color-gray-800: #1d2023;
+  --color-gray-850: #111314;
+  --color-gray-900: #000000;
+  --color-gray-950: #000000;
+
+  --mts-surface: #1d2023;
+  --mts-surface-elevated: #262a2e;
+  --mts-border: #2e3338;
+  --mts-text-primary: #ffffff;
+  --mts-text-secondary: #8a8f95;
+}
+
+.dark body {
+  background: #000000 !important;
+  color: #ffffff;
+}
+
+.dark #sidebar {
+  background: #000000 !important;
+}
+
+/* Primary Buttons */
+.dark button.bg-black,
+.dark button[class*="bg-gray-900"],
+.dark button.dark\:bg-white {
+  background: var(--mts-red) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  border: none !important;
+  transition: background 0.15s ease;
+}
+
+.dark button.bg-black:hover,
+.dark button[class*="bg-gray-900"]:hover,
+.dark button.dark\:bg-white:hover {
+  background: var(--mts-red-hover) !important;
+}
+
+.dark button.bg-black:active,
+.dark button[class*="bg-gray-900"]:active,
+.dark button.dark\:bg-white:active {
+  background: var(--mts-red-active) !important;
+}
+
+/* Send button */
+.dark button[aria-label="Send message"],
+.dark button[id="send-message-button"] {
+  background: var(--mts-red) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+.dark button[aria-label="Send message"]:hover,
+.dark button[id="send-message-button"]:hover {
+  background: var(--mts-red-hover) !important;
+}
+
+/* Secondary Buttons */
+.dark button.bg-gray-800,
+.dark button[class*="dark:bg-gray-8"] {
+  background: var(--mts-surface) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 12px !important;
+  color: #ffffff !important;
+}
+
+.dark button.bg-gray-800:hover,
+.dark button[class*="dark:bg-gray-8"]:hover {
+  background: var(--mts-surface-elevated) !important;
+}
+
+/* Input fields */
+.dark input[type="text"],
+.dark input[type="search"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="url"],
+.dark textarea,
+.dark select {
+  background: var(--mts-surface) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 12px !important;
+  color: #ffffff !important;
+  transition: border-color 0.15s ease;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: var(--mts-red) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--mts-red) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--mts-text-secondary) !important;
+}
+
+/* Chat input */
+.dark #chat-input-container {
+  padding-left: 0.75rem !important;
+}
+
+.dark #chat-input {
+  padding-left: 0.5rem !important;
+}
+
+.dark #chat-input .tiptap,
+.dark #chat-input [contenteditable] {
+  padding-left: 0.5rem !important;
+}
+
+.dark #chat-input .is-editor-empty::before {
+  padding-left: 0.5rem !important;
+}
+
+/* Chat input container */
+.dark #chat-input,
+.dark [id*="chat-textarea"] {
+  background: var(--mts-surface) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 16px !important;
+}
+
+.dark #chat-input:focus-within,
+.dark [id*="chat-textarea"]:focus-within {
+  border-color: var(--mts-red) !important;
+}
+
+/* Cards & Surfaces */
+.dark .bg-gray-850,
+.dark [class*="dark:bg-gray-850"],
+.dark .bg-gray-800,
+.dark [class*="dark:bg-gray-800"] {
+  background: var(--mts-surface) !important;
+}
+
+/* Borders */
+.dark [class*="border-gray"],
+.dark [class*="dark:border-gray"] {
+  border-color: var(--mts-border) !important;
+}
+
+/* Dropdowns */
+.dark [class*="dropdown"],
+.dark .menu,
+.dark [role="menu"],
+.dark [role="listbox"] {
+  background: var(--mts-surface) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 16px !important;
+}
+
+/* Scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: #3b3b3b !important;
+  border-radius: 8px !important;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* Modals */
+.dark [role="dialog"],
+.dark .modal {
+  background: var(--mts-surface) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 24px !important;
+}
+
+/* Tooltips */
+.dark [role="tooltip"] {
+  background: var(--mts-surface-elevated) !important;
+  border: 1px solid var(--mts-border) !important;
+  border-radius: 12px !important;
+}
+
+/* Selection */
+.dark ::selection {
+  background: rgba(255, 0, 50, 0.3);
+  color: #ffffff;
+}
+
+/* Links */
+.dark a:not([class]) {
+  color: var(--mts-red);
+}
+
+.dark a:not([class]):hover {
+  color: var(--mts-red-hover);
+}

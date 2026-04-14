@@ -254,27 +254,23 @@
 	});
 </script>
 
-<Modal size="xl" bind:show>
+<Modal size="md" bind:show>
 	<div class="py-3 dark:text-gray-300 text-gray-700">
 		<div class="px-4 pb-1.5">
 			<SearchInput
 				bind:value={query}
 				on:input={searchHandler}
-				placeholder={$i18n.t('Search')}
+				placeholder={$i18n.t('Поиск в чатах...')}
 				showClearButton={true}
 				onFocus={() => {
 					selectedIdx = null;
-					messages = null;
 				}}
 				onKeydown={(e) => {
-					console.log('e', e);
-
 					if (e.code === 'Enter' && (chatList ?? []).length > 0) {
 						const item = document.querySelector(`[data-arrow-selected="true"]`);
 						if (item) {
 							item?.click();
 						}
-
 						show = false;
 						return;
 					} else if (e.code === 'ArrowDown') {
@@ -291,16 +287,10 @@
 			/>
 		</div>
 
-		<!-- <hr class="border-gray-50 dark:border-gray-850/30 my-1" /> -->
-
-		<div class="flex px-4 pb-1">
+		<div class="px-4 pb-1">
 			<div
-				class="flex flex-col overflow-y-auto h-96 md:h-[40rem] max-h-full scrollbar-hidden w-full flex-1 pr-2"
+				class="flex flex-col overflow-y-auto max-h-80 scrollbar-hidden w-full"
 			>
-				<div class="w-full text-xs text-gray-500 dark:text-gray-500 font-medium pb-2 px-2">
-					{$i18n.t('Actions')}
-				</div>
-
 				{#each actions as action, idx (action.label)}
 					<button
 						class=" w-full flex items-center rounded-xl text-sm py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-850 {selectedIdx ===
@@ -328,8 +318,6 @@
 				{/each}
 
 				{#if chatList}
-					<hr class="border-gray-50 dark:border-gray-850/30 my-3" />
-
 					{#if chatList.length === 0}
 						<div class="text-xs text-gray-500 dark:text-gray-400 text-center px-5 py-4">
 							{$i18n.t('No results found')}
@@ -340,28 +328,10 @@
 						{#if idx === 0 || (idx > 0 && chat.time_range !== chatList[idx - 1].time_range)}
 							<div
 								class="w-full text-xs text-gray-500 dark:text-gray-500 font-medium {idx === 0
-									? ''
-									: 'pt-5'} pb-2 px-2"
+									? 'pt-2'
+									: 'pt-4'} pb-1 px-2"
 							>
 								{$i18n.t(chat.time_range)}
-								<!-- localisation keys for time_range to be recognized from the i18next parser (so they don't get automatically removed):
-							{$i18n.t('Today')}
-							{$i18n.t('Yesterday')}
-							{$i18n.t('Previous 7 days')}
-							{$i18n.t('Previous 30 days')}
-							{$i18n.t('January')}
-							{$i18n.t('February')}
-							{$i18n.t('March')}
-							{$i18n.t('April')}
-							{$i18n.t('May')}
-							{$i18n.t('June')}
-							{$i18n.t('July')}
-							{$i18n.t('August')}
-							{$i18n.t('September')}
-							{$i18n.t('October')}
-							{$i18n.t('November')}
-							{$i18n.t('December')}
-							-->
 							</div>
 						{/if}
 
@@ -387,19 +357,6 @@
 									{chat?.title}
 								</div>
 							</div>
-
-							<div class=" pl-3 shrink-0 text-gray-500 dark:text-gray-400 text-xs">
-								{$i18n.t(
-									dayjs(chat?.updated_at * 1000).calendar(null, {
-										sameDay: '[Today]',
-										nextDay: '[Tomorrow]',
-										nextWeek: 'dddd',
-										lastDay: '[Yesterday]',
-										lastWeek: '[Last] dddd',
-										sameElse: 'L' // use localized format, otherwise dayjs.calendar() defaults to DD/MM/YYYY
-									})
-								)}
-							</div>
 						</a>
 					{/each}
 
@@ -411,43 +368,14 @@
 								}
 							}}
 						>
-							<div class="w-full flex justify-center py-4 text-xs animate-pulse items-center gap-2">
+							<div class="w-full flex justify-center py-3 text-xs animate-pulse items-center gap-2">
 								<Spinner className=" size-4" />
-								<div class=" ">{$i18n.t('Loading...')}</div>
 							</div>
 						</Loader>
 					{/if}
 				{:else}
-					<div class="w-full h-full flex justify-center items-center">
+					<div class="w-full flex justify-center py-4">
 						<Spinner className="size-5" />
-					</div>
-				{/if}
-			</div>
-			<div
-				id="chat-preview"
-				class="hidden md:flex md:flex-1 w-full overflow-y-auto h-96 md:h-[40rem] scrollbar-hidden"
-			>
-				{#if messages === null}
-					<div
-						class="w-full h-full flex justify-center items-center text-gray-500 dark:text-gray-400 text-sm"
-					>
-						{$i18n.t('Select a conversation to preview')}
-					</div>
-				{:else}
-					<div class="w-full h-full flex flex-col">
-						<Messages
-							className="h-full flex pt-4 pb-8 w-full"
-							chatId={`chat-preview-${selectedChat?.id ?? ''}`}
-							user={$user}
-							readOnly={true}
-							{selectedModels}
-							bind:history
-							bind:messages
-							autoScroll={true}
-							sendMessage={() => {}}
-							continueResponse={() => {}}
-							regenerateResponse={() => {}}
-						/>
 					</div>
 				{/if}
 			</div>
