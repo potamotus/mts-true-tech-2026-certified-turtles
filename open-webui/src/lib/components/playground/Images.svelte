@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import { onMount, getContext } from 'svelte';
+	import { fade } from 'svelte/transition';
 
+	import { showSidebar, mobile, user } from '$lib/stores';
 	import { CT_API_BASE_URL } from '$lib/constants';
 
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import Tooltip from '$lib/components/common/Tooltip.svelte';
+	import SidebarIcon from '$lib/components/icons/Sidebar.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -13,7 +17,6 @@
 		{ id: 'qwen-image-lightning', name: 'Qwen Image Lightning' }
 	];
 
-	let loaded = false;
 	let loading = false;
 
 	let prompt = '';
@@ -23,7 +26,7 @@
 
 	let promptTextareaElement: HTMLTextAreaElement;
 	let fileInputElement: HTMLInputElement;
-	let imagesContainerElement: HTMLDivElement;
+	let messagesContainerElement: HTMLDivElement;
 
 	const resizePromptTextarea = () => {
 		if (promptTextareaElement) {
@@ -71,8 +74,8 @@
 	};
 
 	const scrollToBottom = () => {
-		if (imagesContainerElement) {
-			imagesContainerElement.scrollTop = imagesContainerElement.scrollHeight;
+		if (messagesContainerElement) {
+			messagesContainerElement.scrollTop = messagesContainerElement.scrollHeight;
 		}
 	};
 
@@ -105,6 +108,7 @@
 			const data = await res.json();
 			if (data?.data) {
 				generatedImages = [...generatedImages, ...data.data];
+				prompt = '';
 				setTimeout(scrollToBottom, 100);
 			}
 		} catch (error) {
@@ -129,13 +133,9 @@
 			toast.error($i18n.t('Failed to download image'));
 		}
 	};
-
-	onMount(async () => {
-		loaded = true;
-	});
 </script>
 
-{#snippet inputArea()}
+{#snippet inputBox()}
 	<div
 		class="flex flex-col shadow-lg rounded-3xl border border-gray-100/20 dark:border-gray-850/40 px-1 bg-white dark:bg-gray-900 backdrop-blur-sm"
 	>
@@ -220,72 +220,114 @@
 	</div>
 {/snippet}
 
-<div class="h-full w-full max-w-full flex flex-col">
-	{#if generatedImages.length > 0}
-		<!-- Model selector -->
-		<div class="sticky top-0 z-30 w-full px-4 py-2.5">
-			<select
-				bind:value={selectedModel}
-				class="bg-transparent text-sm font-medium text-gray-700 dark:text-gray-200 outline-none cursor-pointer hover:text-black dark:hover:text-white transition"
-			>
-				{#each IMAGE_MODELS as model}
-					<option value={model.id}>{model.name}</option>
-				{/each}
-			</select>
-		</div>
+<div
+	class="h-screen max-h-[100dvh] transition-width duration-200 ease-in-out {$showSidebar
+		? 'md:max-w-[calc(100%-var(--sidebar-width))]'
+		: ''} w-full max-w-full flex flex-col"
+>
+	<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+		<!-- Navbar -->
+		<nav class="sticky top-0 z-30 w-full">
+			<div class="flex items-center w-full pl-1.5 pr-1">
+				<div class="flex max-w-full w-full mx-auto px-1.5 md:px-2 pt-0.5 bg-transparent">
+					<div class="flex items-center w-full max-w-full">
+						{#if $mobile && !$showSidebar}
+							<div class="-translate-x-0.5 mr-1 mt-1 self-start flex flex-none items-center text-gray-600 dark:text-gray-400">
+								<Tooltip content={$i18n.t('Open Sidebar')}>
+									<button
+										class="cursor-pointer flex rounded-lg hover:bg-gray-100 dark:hover:bg-gray-850 transition"
+										on:click={() => showSidebar.set(true)}
+									>
+										<div class="self-center p-1.5">
+											<SidebarIcon />
+										</div>
+									</button>
+								</Tooltip>
+							</div>
+						{/if}
 
-		<!-- Results grid -->
-		<div class="flex flex-col flex-auto z-10 w-full overflow-auto">
-			<div
-				bind:this={imagesContainerElement}
-				class="pb-2.5 flex flex-col w-full flex-auto overflow-auto h-0 max-w-full scrollbar-hidden"
-			>
-				<div class="w-full max-w-6xl mx-auto px-4 py-4">
-					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-						{#each generatedImages as image, index}
-							<button
-								class="relative group cursor-pointer"
-								on:click={() => downloadImage(image.url, index)}
+						<div class="flex-1 overflow-hidden max-w-full py-0.5 {$showSidebar ? 'ml-1' : ''}">
+							<select
+								bind:value={selectedModel}
+								class="bg-transparent text-lg font-medium text-gray-700 dark:text-gray-200 outline-none cursor-pointer hover:text-black dark:hover:text-white transition py-1"
 							>
-								<img src={image.url} alt="" class="w-full aspect-square object-cover rounded-2xl border border-gray-100/20 dark:border-gray-800/40" />
-								<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-2xl flex items-center justify-center">
-									<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-										<polyline points="7,10 12,15 17,10" />
-										<line x1="12" y1="15" x2="12" y2="3" />
-									</svg>
-								</div>
-							</button>
-						{/each}
+								{#each IMAGE_MODELS as model}
+									<option value={model.id}>{model.name}</option>
+								{/each}
+							</select>
+						</div>
 					</div>
 				</div>
-				<div class="pb-14"></div>
 			</div>
-		</div>
+		</nav>
 
-		<!-- Input at bottom -->
-		<div class="w-full font-primary">
-			<div class="mx-auto bg-transparent flex justify-center">
-				<div class="flex flex-col px-3 max-w-6xl w-full pb-3">
-					{@render inputArea()}
+		<!-- Content -->
+		<div class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
+			{#if generatedImages.length > 0}
+				<!-- Images grid -->
+				<div
+					bind:this={messagesContainerElement}
+					class="pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto h-0 max-w-full z-10 scrollbar-hidden"
+				>
+					<div class="h-full w-full flex flex-col">
+						<div class="w-full max-w-6xl mx-auto px-4 py-4">
+							<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+								{#each generatedImages as image, index}
+									<button
+										class="relative group cursor-pointer"
+										on:click={() => downloadImage(image.url, index)}
+									>
+										<img src={image.url} alt="" class="w-full aspect-square object-cover rounded-2xl border border-gray-100/20 dark:border-gray-800/40" />
+										<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-2xl flex items-center justify-center">
+											<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+												<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+												<polyline points="7,10 12,15 17,10" />
+												<line x1="12" y1="15" x2="12" y2="3" />
+											</svg>
+										</div>
+									</button>
+								{/each}
+							</div>
+						</div>
+						<div class="pb-12"></div>
+					</div>
 				</div>
-			</div>
-		</div>
-	{:else}
-		<!-- Empty state: centered text + input -->
-		<div class="flex flex-col items-center justify-center flex-auto w-full">
-			<div class="w-full max-w-6xl px-4 mb-5 mt-16 text-center">
-				<div class="text-3xl font-medium text-gray-400 dark:text-gray-500 mb-2">
-					{$i18n.t('Create an image')}
-				</div>
-				<div class="text-sm text-gray-400 dark:text-gray-600">
-					{$i18n.t('Describe what you want to generate')}
-				</div>
-			</div>
 
-			<div class="w-full max-w-6xl px-3">
-				{@render inputArea()}
-			</div>
+				<!-- Input at bottom -->
+				<div class="pb-2 z-10">
+					<div class="w-full font-primary">
+						<div class="mx-auto inset-x-0 bg-transparent flex justify-center">
+							<div class="flex flex-col px-3 max-w-6xl w-full">
+								{@render inputBox()}
+							</div>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<!-- Empty state (like Placeholder) -->
+				<div class="flex items-center h-full">
+					<div class="m-auto w-full max-w-6xl px-2 @2xl:px-20 translate-y-6 py-24 text-center">
+						<div class="w-full text-3xl text-gray-800 dark:text-gray-100 text-center flex items-center gap-4 font-primary">
+							<div class="w-full flex flex-col justify-center items-center">
+								<div class="flex flex-col items-center w-full px-5 max-w-3xl" in:fade={{ duration: 200 }}>
+									<div class="text-3xl font-medium whitespace-nowrap text-gray-700 dark:text-gray-200">
+										{$i18n.t('Create an image')}
+									</div>
+									<div class="text-sm font-normal text-gray-400 dark:text-gray-500 mt-2">
+										{$i18n.t('Describe what you want to generate')}
+									</div>
+								</div>
+
+								<div class="mt-2 mb-2"></div>
+
+								<div class="text-base font-normal @md:max-w-3xl w-full py-3">
+									{@render inputBox()}
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</div>
-	{/if}
+	</div>
 </div>

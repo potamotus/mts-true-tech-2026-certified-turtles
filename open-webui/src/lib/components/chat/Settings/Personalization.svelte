@@ -14,10 +14,10 @@
 	let showManageModal = false;
 
 	// Addons
-	let enableMemory = false;
+	let enableMemory = true;
 
 	onMount(async () => {
-		enableMemory = $settings?.memory ?? false;
+		enableMemory = $settings?.memory ?? true;
 	});
 </script>
 
