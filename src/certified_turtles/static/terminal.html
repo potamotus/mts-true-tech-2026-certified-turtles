@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>GPTHub Terminal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0f172a; overflow: hidden; }
+  #terminal { height: 100%; width: 100%; }
+  #status { position: fixed; top: 8px; right: 12px; font: 12px system-ui; color: #64748b; z-index: 10; }
+  #status.connected { color: #22c55e; }
+  #status.error { color: #ef4444; }
+</style>
+</head>
+<body>
+<div id="status">connecting...</div>
+<div id="terminal"></div>
+
+<script type="module">
+import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/+esm';
+import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/+esm';
+import { WebLinksAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/+esm';
+
+const statusEl = document.getElementById('status');
+const termEl = document.getElementById('terminal');
+
+const term = new Terminal({
+  cursorBlink: true,
+  fontSize: 14,
+  fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace',
+  theme: {
+    background: '#0f172a',
+    foreground: '#e2e8f0',
+    cursor: '#ff002d',
+    selectionBackground: '#334155',
+    black: '#1e293b',
+    red: '#ff002d',
+    green: '#22c55e',
+    yellow: '#eab308',
+    blue: '#3b82f6',
+    magenta: '#a855f7',
+    cyan: '#06b6d4',
+    white: '#e2e8f0',
+    brightBlack: '#475569',
+    brightRed: '#ff4d6a',
+    brightGreen: '#4ade80',
+    brightYellow: '#facc15',
+    brightBlue: '#60a5fa',
+    brightMagenta: '#c084fc',
+    brightCyan: '#22d3ee',
+    brightWhite: '#f8fafc',
+  },
+});
+
+const fitAddon = new FitAddon();
+term.loadAddon(fitAddon);
+term.loadAddon(new WebLinksAddon());
+term.open(termEl);
+fitAddon.fit();
+
+// WebSocket
+const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const params = new URLSearchParams(location.search);
+const session = params.get('session') || 'gpthub';
+const ws = new WebSocket(`${proto}//${location.host}/ws/terminal?session=${session}`);
+
+ws.onopen = () => {
+  statusEl.textContent = 'connected';
+  statusEl.className = 'connected';
+  // Send initial size
+  sendResize(term.cols, term.rows);
+  term.focus();
+};
+
+ws.onmessage = (e) => {
+  term.write(e.data);
+};
+
+ws.onclose = () => {
+  statusEl.textContent = 'disconnected';
+  statusEl.className = 'error';
+  term.write('\r\n\x1b[31m[session ended]\x1b[0m\r\n');
+};
+
+ws.onerror = () => {
+  statusEl.textContent = 'error';
+  statusEl.className = 'error';
+};
+
+// Terminal input → WebSocket
+term.onData((data) => {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(data);
+  }
+});
+
+// Resize
+function sendResize(cols, rows) {
+  if (ws.readyState === WebSocket.OPEN) {
+    const buf = new ArrayBuffer(5);
+    const view = new DataView(buf);
+    view.setUint8(0, 0x72); // 'r'
+    view.setUint16(1, cols);
+    view.setUint16(3, rows);
+    ws.send(buf);
+  }
+}
+
+term.onResize(({ cols, rows }) => sendResize(cols, rows));
+window.addEventListener('resize', () => fitAddon.fit());
+
+// Initial fit after fonts load
+setTimeout(() => fitAddon.fit(), 100);
+</script>
+</body>
+</html>

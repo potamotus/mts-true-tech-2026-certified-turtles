@@ -26,6 +26,8 @@ from certified_turtles.api.openai_proxy import router as openai_proxy_router
 from certified_turtles.api.uploads import router as uploads_router
 from certified_turtles.api.agent_config import router as agent_config_router
 from certified_turtles.api.mws_tables_config import router as mws_tables_router
+from certified_turtles.api.anthropic_adapter import router as anthropic_adapter_router
+from certified_turtles.api.terminal_ws import router as terminal_ws_router
 
 _backend = get_backend_logger()
 
@@ -172,6 +174,8 @@ app.include_router(memory_router, prefix="/api/v1")
 app.include_router(instructions_router, prefix="/api/v1")
 app.include_router(mws_tables_router, prefix="/api/v1")
 app.include_router(agent_config_router, prefix="/api/v1")
+app.include_router(anthropic_adapter_router, prefix="/anthropic")
+app.include_router(terminal_ws_router)
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -180,6 +184,11 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 @app.get("/memory")
 async def memory_page():
     return FileResponse(_STATIC_DIR / "memory.html", media_type="text/html")
+
+
+@app.get("/terminal")
+async def terminal_page():
+    return FileResponse(_STATIC_DIR / "terminal.html", media_type="text/html")
 
 
 @app.get("/static/{filename}")

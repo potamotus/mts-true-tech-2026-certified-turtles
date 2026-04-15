@@ -10,14 +10,10 @@ import { profileCheckpoint, profileReport } from './utils/startupProfiler.js';
 
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
 profileCheckpoint('main_tsx_entry');
-import { startMdmRawRead } from './utils/settings/mdm/rawRead.js';
-
-// eslint-disable-next-line custom-rules/no-top-level-side-effects
-startMdmRawRead();
-import { ensureKeychainPrefetchCompleted, startKeychainPrefetch } from './utils/secureStorage/keychainPrefetch.js';
-
-// eslint-disable-next-line custom-rules/no-top-level-side-effects
-startKeychainPrefetch();
+// GPTHub: skip keychain and MDM init
+const startMdmRawRead = () => {};
+const ensureKeychainPrefetchCompleted = async () => {};
+const startKeychainPrefetch = () => {};
 import { feature } from 'bun:bundle';
 import { Command as CommanderCommand, InvalidArgumentError, Option } from '@commander-js/extra-typings';
 import chalk from 'chalk';
@@ -911,9 +907,9 @@ async function run(): Promise<CommanderCommand> {
     // Must resolve before init() which triggers the first settings read
     // (applySafeConfigEnvironmentVariables → getSettingsForSource('policySettings')
     // → isRemoteManagedSettingsEligible → sync keychain reads otherwise ~65ms).
-    await Promise.all([ensureMdmSettingsLoaded(), ensureKeychainPrefetchCompleted()]);
+    // GPTHub: skip MDM/keychain/init
     profileCheckpoint('preAction_after_mdm');
-    await init();
+    // await init();
     profileCheckpoint('preAction_after_init');
 
     // process.title on Windows sets the console title directly; on POSIX,
@@ -1775,7 +1771,7 @@ async function run(): Promise<CommanderCommand> {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(warning);
     });
-    void assertMinVersion();
+    // GPTHub: skip version check
 
     // claude.ai config fetch: -p mode only (interactive uses useManageMCPConnections
     // two-phase loading). Kicked off here to overlap with setup(); awaited
@@ -2011,7 +2007,7 @@ async function run(): Promise<CommanderCommand> {
     //  - flag absent from disk (== null also catches pre-#22279 poisoned null)
     const explicitModel = options.model || process.env.ANTHROPIC_MODEL;
     if ("external" === 'ant' && explicitModel && explicitModel !== 'default' && !hasGrowthBookEnvOverride('tengu_ant_model_override') && getGlobalConfig().cachedGrowthBookFeatures?.['tengu_ant_model_override'] == null) {
-      await initializeGrowthBook();
+      // GPTHub: skip GrowthBook
     }
 
     // Special case the default model with the null keyword
