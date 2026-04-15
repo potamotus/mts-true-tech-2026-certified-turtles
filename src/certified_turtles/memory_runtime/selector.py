@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
 from certified_turtles.mws_gpt.client import MWSGPTClient
 
 from .storage import MemoryHeader, format_memory_manifest
+
+_log = logging.getLogger(__name__)
 
 
 SELECTOR_SYSTEM_PROMPT = """You are selecting memories that will be useful to Claude Code as it processes a user's query. You will be given the user's query and a list of available memory files with their filenames and descriptions.
@@ -60,7 +63,7 @@ def select_relevant_memories(
 ) -> list[str]:
     if not headers or not query.strip():
         return []
-    headers = [h for h in headers if h.filename not in (already_surfaced or set())]
+    # Don't filter by already_surfaced — memories should be available every turn.
     if not headers:
         return []
     manifest = format_memory_manifest(headers)
@@ -83,10 +86,18 @@ def select_relevant_memories(
         )
         content = (((raw.get("choices") or [{}])[0].get("message") or {}).get("content")) or "{}"
         parsed = json.loads(content)
-        selected = parsed.get("selected_memories", [])
+        selected = parsed.get("selected_memories") or parsed.get("memories") or parsed.get("filenames") or []
         if isinstance(selected, list):
-            valid = [x for x in selected if isinstance(x, str) and x in available]
-            return valid[:limit]
+            cleaned: list[str] = []
+            for x in selected:
+                if not isinstance(x, str):
+                    continue
+                # LLM may return "[user] file.md" instead of "file.md"
+                name = re.sub(r"^\[.*?\]\s*", "", x).strip()
+                if name in available:
+                    cleaned.append(name)
+            return cleaned[:limit]
         return []
     except Exception:
-        return []
+        _log.debug("select_relevant_memories LLM failed, falling back", exc_info=True)
+        return fallback_select(headers, query, limit=limit, recent_tools=recent_tools)

@@ -248,6 +248,43 @@ export const getOAuthClientAuthorizationUrl = (clientId: string, type: null | st
 	return `${WEBUI_BASE_URL}/oauth/clients/${oauthClientId}/authorize`;
 };
 
+export const getMcpRegistryServers = async (
+	token: string,
+	search: string = '',
+	cursor: string = '',
+	limit: number = 20
+) => {
+	let error = null;
+
+	const params = new URLSearchParams();
+	if (search) params.set('search', search);
+	if (cursor) params.set('cursor', cursor);
+	params.set('limit', String(limit));
+
+	const res = await fetch(`${WEBUI_API_BASE_URL}/configs/mcp_registry?${params.toString()}`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		}
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.catch((err) => {
+			console.error(err);
+			error = err.detail;
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+
+	return res;
+};
+
 export const getCodeExecutionConfig = async (token: string) => {
 	let error = null;
 

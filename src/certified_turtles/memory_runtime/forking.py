@@ -10,7 +10,7 @@ from certified_turtles.agent_debug_log import agent_logger, debug_clip
 from certified_turtles.agents.loop import run_agent_chat
 from certified_turtles.agents.registry import get_subagent
 from certified_turtles.mws_gpt.client import MWSGPTClient
-from certified_turtles.memory_runtime.file_state import clone_file_state_namespace
+from certified_turtles.memory_runtime.file_state import clone_file_state_namespace  # noqa: F401 — kept for potential future use
 from certified_turtles.memory_runtime.request_context import RequestContext
 from certified_turtles.tools.registry import openai_tools_for_names
 
@@ -55,8 +55,9 @@ class ForkRuntime:
         if snap is None or spec is None:
             return None
         tool_list = openai_tools_for_names(spec.tool_names)
-        child_namespace = f"{snap.file_state_namespace}::agent::{agent_id}"
-        clone_file_state_namespace(snap.file_state_namespace, child_namespace)
+        # Fresh namespace — don't clone parent's file state so subagent
+        # reads actual file contents instead of [FILE_UNCHANGED_STUB].
+        child_namespace = f"agent::{agent_id}::{session_id}::{int(time.time())}"
         work = [
             *snap.messages,
             {"role": "system", "content": spec.system_prompt},
@@ -69,11 +70,13 @@ class ForkRuntime:
             len(work),
             debug_clip(prompt),
         )
+        model = snap.model
         out = run_agent_chat(
             client,
-            snap.model,
+            model,
             work,
             tools=tool_list,
+            max_total_tokens=spec.max_total_tokens,
             request_context=RequestContext(
                 session_id=snap.session_id,
                 scope_id=snap.scope_id,

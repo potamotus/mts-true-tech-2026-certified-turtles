@@ -8,9 +8,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from certified_turtles.api.agent_config import get_max_agent_tokens
 from certified_turtles.chat_modes import prepare_chat_request
 from certified_turtles.mws_gpt.client import MWSGPTError, http_status_for_mws_error
-from certified_turtles.api.agent_config import get_max_agent_tokens
 from certified_turtles.services.llm import LLMService
 
 router = APIRouter(tags=["agent"])
@@ -52,11 +52,12 @@ async def agent_chat(body: AgentChatRequest):
         for_agent=True,
     )
     messages = prepared.messages
-    max_tool_rounds = body.max_tool_rounds
-    if prepared.max_tool_rounds_override is not None:
-        max_tool_rounds = max(max_tool_rounds, prepared.max_tool_rounds_override)
     if prepared.forced_agent_id:
         extra["forced_agent_id"] = prepared.forced_agent_id
+
+    budget = body.max_agent_tokens or get_max_agent_tokens()
+    if prepared.max_total_tokens_override is not None:
+        budget = max(budget, prepared.max_total_tokens_override)
 
     if body.stream:
         def _event_stream():
@@ -64,7 +65,7 @@ async def agent_chat(body: AgentChatRequest):
                 for event in service.stream_agent(
                     body.model,
                     messages,
-                    max_tool_rounds=max_tool_rounds,
+                    max_total_tokens=budget,
                     **extra,
                 ):
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -85,7 +86,7 @@ async def agent_chat(body: AgentChatRequest):
             service.run_agent,
             body.model,
             messages,
-            max_tool_rounds=max_tool_rounds,
+            max_agent_tokens=budget,
             **extra,
         )
     except MWSGPTError as e:

@@ -13,15 +13,11 @@ from certified_turtles.tools.parent_tools import get_parent_tools
 
 _llm_log = agent_logger("llm")
 
-_DEFAULT_MAX_AGENT_TOKENS = 128_000
 
-
-def clamp_agent_tool_rounds(value: Any) -> int:
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return 10
-    return max(1, min(n, 40))
+def _get_max_agent_tokens() -> int:
+    """Lazy wrapper to avoid circular import with api.agent_config."""
+    from certified_turtles.api.agent_config import get_max_agent_tokens
+    return get_max_agent_tokens()
 
 
 class LLMService:
@@ -91,7 +87,7 @@ class LLMService:
             _llm_log.info("Auto-routing (plain): %s", routing.reason)
 
         _llm_log.debug("chat_plain after normalize\n%s", summarize_messages(messages))
-        call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice", "request_context")}
+        call_kwargs = {k: v for k, v in extra.items() if k not in ("request_context",)}
         return self._client.chat_completions(resolved_model, messages, **call_kwargs)
 
     def chat_plain_stream(
@@ -104,8 +100,8 @@ class LLMService:
     ) -> Iterator[bytes]:
         """Plain chat with true SSE streaming from upstream."""
         messages = normalize_chat_messages(messages)
-        call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice", "request_context")}
-        return self._client.chat_completions_stream(model, messages, **call_kwargs)
+        call_kwargs = {k: v for k, v in extra.items() if k not in ("request_context",)}
+        return self._client.chat_completions_stream_raw(model, messages, **call_kwargs)
 
     def run_agent(
         self,
@@ -125,9 +121,9 @@ class LLMService:
         if routing:
             _llm_log.info("Auto-routing (agent): %s", routing.reason)
 
-        budget = max_agent_tokens or _DEFAULT_MAX_AGENT_TOKENS
+        budget = max_agent_tokens or _get_max_agent_tokens()
         _llm_log.debug(
-            "run_agent after normalize max_agent_tokens=%s tools_explicit=%s\n%s",
+            "run_agent after normalize max_total_tokens=%s tools_explicit=%s\n%s",
             budget,
             tools is not None,
             summarize_messages(messages),
@@ -137,7 +133,7 @@ class LLMService:
             resolved_model,
             messages,
             tools=tools,
-            max_agent_tokens=budget,
+            max_total_tokens=budget,
             request_context=request_context,
             **extra,
         )
@@ -147,7 +143,7 @@ class LLMService:
         model: str,
         messages: list[dict[str, Any]],
         *,
-        max_tool_rounds: int = 10,
+        max_total_tokens: int = 0,
         tools: list[dict[str, Any]] | None = None,
         **extra: Any,
     ):
@@ -159,10 +155,10 @@ class LLMService:
         if routing:
             _llm_log.info("Auto-routing (stream): %s", routing.reason)
 
-        rounds = clamp_agent_tool_rounds(max_tool_rounds)
+        budget = max_total_tokens or _get_max_agent_tokens()
         _llm_log.debug(
-            "stream_agent after normalize max_tool_rounds=%s tools_explicit=%s\n%s",
-            rounds,
+            "stream_agent after normalize max_total_tokens=%s tools_explicit=%s\n%s",
+            budget,
             tools is not None,
             summarize_messages(messages),
         )
@@ -171,6 +167,6 @@ class LLMService:
             resolved_model,
             messages,
             tools=tools,
-            max_tool_rounds=rounds,
+            max_total_tokens=budget,
             **extra,
         )

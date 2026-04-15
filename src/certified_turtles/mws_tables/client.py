@@ -178,6 +178,14 @@ class MWSTablesClient:
             payload["property"] = property
         return self._request("POST", f"/datasheets/{datasheet_id}/fields", payload=payload)
 
+    def update_field(self, datasheet_id: str, field_id: str, *, name: str | None = None, property: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if name is not None:
+            payload["name"] = name
+        if property is not None:
+            payload["property"] = property
+        return self._request("PATCH", f"/datasheets/{datasheet_id}/fields/{field_id}", payload=payload)
+
     def delete_field(self, datasheet_id: str, field_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"/datasheets/{datasheet_id}/fields/{field_id}")
 

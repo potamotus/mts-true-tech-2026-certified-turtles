@@ -27,7 +27,7 @@ from certified_turtles.model_mode import (
     should_merge_virtual_models_into_list,
 )
 from certified_turtles.api.agent_config import get_max_agent_tokens
-from certified_turtles.services.llm import LLMService, clamp_agent_tool_rounds
+from certified_turtles.services.llm import LLMService
 from certified_turtles.services.message_normalize import normalize_chat_messages
 
 router = APIRouter(tags=["openai-proxy"])
@@ -38,8 +38,6 @@ _PASS_THROUGH_IGNORE = {
     "messages",
     "stream",
     "max_agent_tokens",
-    "tools",
-    "tool_choice",
     "use_agent",
     "ct_use_agent",
     "agent_mode",
@@ -453,24 +451,23 @@ def _agent_sse_stream(
     model: str,
     messages: list[dict[str, Any]],
     *,
-    max_tool_rounds: int,
+    max_total_tokens: int,
     extra: dict[str, Any],
     runtime: Any = None,
     session_id: str = "",
     scope_id: str = "",
-    prepared_messages: list[dict[str, Any]] | None = None,
 ):
     cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
     cumulative_output: list[dict[str, Any]] = []
     yield _sse_line(model, cid, created, {"role": "assistant"}, None)
     try:
-        for event in svc.stream_agent(model, messages, max_tool_rounds=max_tool_rounds, **extra):
+        for event in svc.stream_agent(model, messages, max_total_tokens=max_total_tokens, **extra):
             etype = event.get("type")
             if etype == "done":
                 result = event.get("result") if isinstance(event.get("result"), dict) else {}
                 final_output = result.get("output") if isinstance(result.get("output"), list) else cumulative_output
-                final_messages = result.get("messages") or (prepared_messages or messages)
+                final_messages = result.get("messages") or messages
                 yield _sse_line(
                     model,
                     cid,
@@ -484,7 +481,7 @@ def _agent_sse_stream(
                     runtime.after_response(
                         svc.client,
                         model=model,
-                        prepared_messages=prepared_messages or messages,
+                        prepared_messages=messages,
                         final_messages=final_messages,
                         session_id=session_id,
                         scope_id=scope_id,
@@ -530,7 +527,8 @@ def _agent_sse_stream(
                 elif etype == "status":
                     delta["tool_status"] = piece
                 elif etype == "final":
-                    delta["content"] = piece
+                    # content_stream already sent the text to the client;
+                    # final event is metadata-only to avoid duplication.
                     delta["final"] = piece
                 yield _sse_line(
                     model,
@@ -556,7 +554,7 @@ def _agent_sse_stream(
         return
 
 
-async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, prepared_messages, extra, *, skip_after_response: bool = False):
+async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, extra, *, skip_after_response: bool = False):
     """True upstream SSE for plain mode: pipe chunks, collect content for after_response."""
     import queue as _queue
 
@@ -565,7 +563,7 @@ async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_
 
     def _producer():
         try:
-            call_kwargs = {k: v for k, v in extra.items() if k not in ("tools", "tool_choice", "request_context")}
+            call_kwargs = {k: v for k, v in extra.items() if k not in ("request_context",)}
             for raw_line in svc.chat_plain_stream(model, messages, **call_kwargs):
                 q.put(raw_line)
         except Exception as exc:
@@ -595,11 +593,11 @@ async def _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_
         yield item if item.endswith(b"\n") else item + b"\n"
 
     full_content = "".join(accumulated)
-    final_messages = [*prepared_messages, {"role": "assistant", "content": full_content}]
+    final_messages = [*messages, {"role": "assistant", "content": full_content}]
     if not skip_after_response:
         try:
             runtime.after_response(
-                svc.client, model=model, prepared_messages=prepared_messages,
+                svc.client, model=model, prepared_messages=messages,
                 final_messages=final_messages, session_id=session_id, scope_id=scope_id,
             )
         except Exception:
@@ -708,10 +706,6 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     if not isinstance(max_agent_tokens, int) or max_agent_tokens <= 0:
         max_agent_tokens = get_max_agent_tokens()
     extra = {k: v for k, v in body.items() if k not in _PASS_THROUGH_IGNORE}
-    contract_mode = _request_contract_mode(body)
-    session_id, scope_id = _request_ids(body)
-    runtime = runtime_from_env()
-    max_tool_rounds = clamp_agent_tool_rounds(body.get("max_tool_rounds", 10))
 
     svc = _service()
     # MWS: qwen-image в /v1/models есть, но chat/completions для этих моделей -> 404; генерация только images/generations.
@@ -720,9 +714,13 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
             svc, model, messages, stream=stream, body=body
         )
 
+    runtime = runtime_from_env()
+    contract_mode = _request_contract_mode(body)
+    session_id, scope_id = _request_ids(body)
     ow_meta_plain = _openwebui_meta_task_forces_plain(messages)
     ow_tool_router_plain = _openwebui_tool_router_forces_plain(messages)
     is_conversation = not (ow_meta_plain or ow_tool_router_plain or contract_mode in {"router", "meta_task"})
+    max_total_tokens = get_max_agent_tokens()
     if contract_mode == "agent":
         plain = bool(force_plain)
     else:
@@ -740,19 +738,19 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
     else:
         prepared = prepare_chat_request(body, messages, for_agent=True)
         messages = prepared.messages
-        if prepared.max_tool_rounds_override is not None:
-            max_tool_rounds = max(max_tool_rounds, prepared.max_tool_rounds_override)
+        if prepared.max_total_tokens_override is not None:
+            max_total_tokens = max(max_total_tokens, prepared.max_total_tokens_override)
         if prepared.forced_agent_id:
             extra["forced_agent_id"] = prepared.forced_agent_id
         if prepared.mode_applied:
             _proxy_log.debug(
-                "ct_mode applied=%s forced_agent_id=%s max_tool_rounds=%s",
+                "ct_mode applied=%s forced_agent_id=%s max_total_tokens=%s",
                 prepared.mode_applied,
                 prepared.forced_agent_id,
-                max_tool_rounds,
+                max_total_tokens,
             )
-
-    prepared_messages = runtime.prepare_messages(
+    messages = await asyncio.to_thread(
+        runtime.prepare_messages,
         svc.client,
         model=model,
         messages=messages,
@@ -773,9 +771,7 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         stream,
         max_agent_tokens,
         sorted(extra.keys()),
-        summarize_messages(prepared_messages, preview=400)
-        if isinstance(prepared_messages, list)
-        else str(type(prepared_messages)),
+        summarize_messages(messages, preview=400),
     )
     if stream and not plain:
         return StreamingResponse(
@@ -783,19 +779,18 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
                 svc,
                 model,
                 messages,
-                max_tool_rounds=max_tool_rounds,
+                max_total_tokens=max_total_tokens,
                 extra=extra,
                 runtime=runtime,
                 session_id=session_id,
                 scope_id=scope_id,
-                prepared_messages=prepared_messages,
             ),
             media_type="text/event-stream",
         )
 
     if stream and plain:
         return StreamingResponse(
-            _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, prepared_messages, extra),
+            _upstream_sse_stream(svc, model, messages, runtime, session_id, scope_id, extra),
             media_type="text/event-stream",
         )
 
@@ -804,22 +799,22 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
             completion = await asyncio.to_thread(
                 svc.chat_plain,
                 model,
-                prepared_messages,
+                messages,
                 request_context=req_ctx,
                 **extra,
             )
-            final_messages = [*prepared_messages, (completion.get("choices") or [{}])[0].get("message") or {}]
+            final_messages = [*messages, (completion.get("choices") or [{}])[0].get("message") or {}]
         else:
             out = await asyncio.to_thread(
                 svc.run_agent,
                 model,
-                prepared_messages,
+                messages,
                 max_agent_tokens=max_agent_tokens,
                 request_context=req_ctx,
                 **extra,
             )
             completion = out.get("completion") or {}
-            final_messages = out.get("messages") or prepared_messages
+            final_messages = out.get("messages") or messages
     except MWSGPTError as e:
         raise HTTPException(
             status_code=http_status_for_mws_error(e),
@@ -832,15 +827,14 @@ async def _chat_completions_from_body(body: dict[str, Any], *, force_plain: bool
         "chat_completions response (visible for UI) preview=\n%s",
         debug_clip(_final_assistant_content(completion)),
     )
-    if is_conversation:
-        runtime.after_response(
-            svc.client,
-            model=model,
-            prepared_messages=prepared_messages,
-            final_messages=final_messages,
-            session_id=session_id,
-            scope_id=scope_id,
-        )
+    runtime.after_response(
+        svc.client,
+        model=model,
+        prepared_messages=messages,
+        final_messages=final_messages,
+        session_id=session_id,
+        scope_id=scope_id,
+    )
     completion = _completion_with_visible_markdown(completion)
     if not stream:
         return completion

@@ -528,6 +528,67 @@ register_tool(
 )
 
 
+# ── mws_tables_update_field ──────────────────────────────────
+
+def _handle_update_field(arguments: dict[str, Any]) -> str:
+    if not is_configured():
+        return _not_configured()
+    raw_id = arguments.get("datasheet_id")
+    field_id = arguments.get("field_id", "").strip()
+    if not isinstance(raw_id, str) or not raw_id.strip():
+        return _err("Нужен datasheet_id")
+    if not field_id:
+        return _err("Нужен field_id (fldXXX) — получи через mws_tables_describe")
+    new_name = arguments.get("name", "").strip() or None
+    prop = arguments.get("property")
+    if not new_name and not prop:
+        return _err("Укажи хотя бы name (новое имя) или property (настройки поля)")
+    ds_id = parse_datasheet_id(raw_id)
+    client = get_client()
+    try:
+        resp = client.update_field(ds_id, field_id, name=new_name, property=prop)
+    except MWSTablesError as e:
+        logger.warning("mws_tables_update_field error: %s (status=%s)", e, e.status)
+        return _err(f"MWS Tables API error: {e} (status={e.status})")
+    data = resp.get("data", {})
+    return json.dumps({"ok": True, "field": data}, ensure_ascii=False)
+
+
+register_tool(
+    ToolSpec(
+        name="mws_tables_update_field",
+        description=(
+            "MWS Tables: переименовать колонку или изменить её настройки. "
+            "Сначала получи field_id через mws_tables_describe. "
+            "Возвращает {ok, field} с обновлёнными параметрами."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "datasheet_id": {
+                    "type": "string",
+                    "description": "ID таблицы (dstXXX) или URL",
+                },
+                "field_id": {
+                    "type": "string",
+                    "description": "ID поля (fldXXX) — получи через mws_tables_describe.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Новое название колонки.",
+                },
+                "property": {
+                    "type": "object",
+                    "description": 'Новые настройки поля (например, для SingleSelect: {"options": [{"name": "Opt1"}]}). Необязательно.',
+                },
+            },
+            "required": ["datasheet_id", "field_id"],
+        },
+        handler=_handle_update_field,
+    )
+)
+
+
 # ── mws_tables_delete_field ──────────────────────────────────
 
 def _handle_delete_field(arguments: dict[str, Any]) -> str:

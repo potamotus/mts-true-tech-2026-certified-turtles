@@ -15,6 +15,7 @@ from certified_turtles.agents.json_agent_protocol import message_text_content, p
 from certified_turtles.agents.registry import DEEP_RESEARCH_AGENT_ID, get_subagent
 from certified_turtles.mws_gpt.client import MWSGPTClient
 from certified_turtles.prompts import load_prompt
+from certified_turtles.memory_runtime.request_context import RequestContext, push_request_context, pop_request_context
 from certified_turtles.tools.parent_tools import get_parent_tools, parse_agent_tool_name
 from certified_turtles.tools.registry import openai_tools_for_names, run_primitive_tool
 
@@ -268,6 +269,9 @@ def _tool_call_records_from_message(msg: dict[str, Any]) -> list[dict[str, Any]]
         name = fn.get("name")
         if not isinstance(name, str) or not name.strip():
             continue
+        # MWS model sometimes appends <|channel|>commentary to tool names
+        if "<|channel|>" in name:
+            name = name.split("<|channel|>")[0]
         call_id = call.get("id")
         if not isinstance(call_id, str) or not call_id.strip():
             call_id = f"call_{idx}_{uuid.uuid4().hex[:8]}"
@@ -495,7 +499,7 @@ def _pack_subagent_result(inner: dict[str, Any]) -> str:
         final_text = "(пустой ответ под-агента)"
     parts = [f"[[под-агент]]\n{final_text}"]
     if inner.get("truncated"):
-        parts.append(f"[внутренний лимит раундов: truncated={inner['truncated']}]")
+        parts.append(f"[внутренний лимит токенов: truncated={inner['truncated']}]")
     return "\n".join(parts)
 
 
@@ -572,7 +576,7 @@ def _invoke_subagent(
         inner_messages,
         tools=inner_tools,
         tool_choice="required" if inner_tools else "auto",
-        max_tool_rounds=spec.max_inner_rounds,
+        max_total_tokens=spec.max_total_tokens,
         delegate_depth=delegate_depth + 1,
         max_delegate_depth=max_delegate_depth,
         **inner_kw,
@@ -618,12 +622,11 @@ def _stream_deep_research_gpt_researcher(
     messages: list[dict[str, Any]],
     *,
     delegate_depth: int,
-    max_tool_rounds: int,
     max_delegate_depth: int,
     **chat_kwargs: Any,
 ) -> Iterator[dict[str, Any]]:
     """Режим ct_mode=deep_research: отчёт целиком через GPT Researcher (subprocess), без внутреннего LLM-цикла."""
-    del client, max_tool_rounds, max_delegate_depth, chat_kwargs
+    del client, max_delegate_depth, chat_kwargs
     inner_messages, _ = _forced_subagent_messages(DEEP_RESEARCH_AGENT_ID, messages)
     parts: list[str] = []
     for m in inner_messages:
@@ -690,13 +693,45 @@ def stream_agent_chat(
     *,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: str | dict[str, Any] | None = "auto",
-    max_tool_rounds: int = 10,
+    max_total_tokens: int = 128_000,
     delegate_depth: int = 0,
     max_delegate_depth: int = 3,
     forced_agent_id: str | None = None,
+    request_context: RequestContext | None = None,
     **chat_kwargs: Any,
 ) -> Iterator[dict[str, Any]]:
     """Agent-first runtime с публичными reasoning/status событиями и финальным ответом."""
+    prev_ctx = push_request_context(request_context)
+    try:
+        yield from _stream_agent_chat_inner(
+            client, model, messages,
+            tools=tools, tool_choice=tool_choice,
+            max_total_tokens=max_total_tokens,
+            delegate_depth=delegate_depth,
+            max_delegate_depth=max_delegate_depth,
+            forced_agent_id=forced_agent_id,
+            request_context=request_context,
+            **chat_kwargs,
+        )
+    finally:
+        if request_context is not None:
+            pop_request_context(prev_ctx)
+
+
+def _stream_agent_chat_inner(
+    client: MWSGPTClient,
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: str | dict[str, Any] | None = "auto",
+    max_total_tokens: int = 128_000,
+    delegate_depth: int = 0,
+    max_delegate_depth: int = 3,
+    forced_agent_id: str | None = None,
+    request_context: RequestContext | None = None,
+    **chat_kwargs: Any,
+) -> Iterator[dict[str, Any]]:
     if forced_agent_id:
         if forced_agent_id == DEEP_RESEARCH_AGENT_ID:
             yield from _stream_deep_research_gpt_researcher(
@@ -704,14 +739,14 @@ def stream_agent_chat(
                 model,
                 messages,
                 delegate_depth=delegate_depth,
-                max_tool_rounds=max_tool_rounds,
                 max_delegate_depth=max_delegate_depth,
                 **chat_kwargs,
             )
             return
+        spec = get_subagent(forced_agent_id)
         inner_messages, tool_names = _forced_subagent_messages(forced_agent_id, messages)
         inner_tools = openai_tools_for_names(tool_names)
-        effective_rounds = max(max_tool_rounds, get_subagent(forced_agent_id).max_inner_rounds)
+        effective_budget = max(max_total_tokens, spec.max_total_tokens)
         # "required" на первом раунде — модель обязана вызвать тулы, а не
         # галлюцинировать отчёт. Внутри цикла после первого раунда
         # переключится на "auto" для финального ответа.
@@ -722,9 +757,10 @@ def stream_agent_chat(
             inner_messages,
             tools=inner_tools,
             tool_choice=first_tool_choice,
-            max_tool_rounds=effective_rounds,
+            max_total_tokens=effective_budget,
             delegate_depth=delegate_depth,
             max_delegate_depth=max_delegate_depth,
+            request_context=request_context,
             **chat_kwargs,
         )
         return
@@ -733,10 +769,10 @@ def stream_agent_chat(
     tool_list = get_parent_tools() if tools is None else tools
     use_tools = bool(tool_list)
     _agent_log.debug(
-        "stream_agent_chat start model=%s depth=%s max_rounds=%s tools=%s",
+        "stream_agent_chat start model=%s depth=%s max_total_tokens=%s tools=%s",
         model,
         delegate_depth,
-        max_tool_rounds,
+        max_total_tokens,
         len(tool_list or []),
     )
     _agent_log.debug("messages before inject:\n%s", summarize_messages(work))
@@ -746,11 +782,14 @@ def stream_agent_chat(
     trace: list[dict[str, Any]] = []
     last_raw: dict[str, Any] | None = None
     rounds = 0
+    tokens_used = 0
     # Для первого раунда: если tool_choice="required", заставляем модель
     # использовать инструменты, а со второго раунда переключаемся на "auto".
     effective_tool_choice = tool_choice
 
-    while rounds < max_tool_rounds:
+    while True:
+        if tokens_used >= max_total_tokens:
+            break
         rounds += 1
         call_kwargs = {k: v for k, v in chat_kwargs.items() if k not in ("tools", "tool_choice")}
         if use_tools:
@@ -758,9 +797,10 @@ def stream_agent_chat(
             if effective_tool_choice is not None:
                 call_kwargs["tool_choice"] = effective_tool_choice
         _agent_log.debug(
-            "--- round %s/%s messages_in_flight=%s call_kwargs_keys=%s",
+            "--- round %s tokens_used=%s/%s messages_in_flight=%s call_kwargs_keys=%s",
             rounds,
-            max_tool_rounds,
+            tokens_used,
+            max_total_tokens,
             len(work),
             sorted(call_kwargs.keys()),
         )
@@ -795,6 +835,8 @@ def stream_agent_chat(
                 last_raw = client.chat_completions(model, work, **call_kwargs)
         else:
             last_raw = client.chat_completions(model, work, **call_kwargs)
+        _usage = (last_raw or {}).get("usage", {})
+        tokens_used += _usage.get("total_tokens", 0)
         choice = _first_choice(last_raw)
         msg = _choice_message(choice)
         assistant_text, tool_calls = _extract_assistant_turn(msg, use_tools=use_tools)
@@ -963,7 +1005,7 @@ def stream_agent_chat(
             yield {"type": "done", "result": result}
             return
 
-    tail = "Достиг лимита агентных раундов, поэтому ответ может быть неполным."
+    tail = "Достиг лимита токенов агента, поэтому ответ может быть неполным."
     tail_event = _push_trace_event(trace, "status", tail, depth=delegate_depth)
     if tail_event is not None:
         yield tail_event
@@ -993,8 +1035,7 @@ def run_agent_chat(
     *,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: str | dict[str, Any] | None = "auto",
-    max_tool_rounds: int = 10,
-    max_agent_tokens: int = 128_000,
+    max_total_tokens: int = 128_000,
     delegate_depth: int = 0,
     max_delegate_depth: int = 3,
     request_context: RequestContext | None = None,
@@ -1007,9 +1048,10 @@ def run_agent_chat(
         messages,
         tools=tools,
         tool_choice=tool_choice,
-        max_tool_rounds=max_tool_rounds,
+        max_total_tokens=max_total_tokens,
         delegate_depth=delegate_depth,
         max_delegate_depth=max_delegate_depth,
+        request_context=request_context,
         **chat_kwargs,
     ):
         if event.get("type") == "done":

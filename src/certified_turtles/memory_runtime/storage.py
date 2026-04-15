@@ -431,7 +431,9 @@ def rebuild_memory_index(scope_id: str, *, force: bool = False) -> Path:
     headers = scan_memory_headers(scope_id)
     lines = ["# Memory Index"]
     for item in headers[: max(0, MAX_MEMORY_INDEX_LINES - 1)]:
-        lines.append(f"- [{item.filename}]({item.filename}) — {item.description}")
+        label = item.name or item.filename
+        hook = item.description[:120] if item.description else ""
+        lines.append(f"- [{label}]({item.filename}) — {hook}")
     text = "\n".join(lines).strip() + "\n"
     encoded = text.encode("utf-8")
     if len(encoded) > MAX_MEMORY_INDEX_BYTES:

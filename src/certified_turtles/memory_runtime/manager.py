@@ -26,6 +26,7 @@ from .storage import (
     list_scope_sessions,
     memory_dir,
     memory_index_path,
+    rebuild_memory_index,
     read_json,
     read_last_consolidated_at,
     read_session_memory,
@@ -42,15 +43,31 @@ _log = agent_logger("memory_runtime")
 _RUNTIME: "ClaudeLikeMemoryRuntime | None" = None
 
 def _save_last_model(scope_id: str, model: str) -> None:
+    if not model or model == "auto":
+        return
     meta = read_json(scope_meta_path(scope_id)) or {}
     if meta.get("last_model") != model:
         meta["last_model"] = model
         write_json(scope_meta_path(scope_id), meta)
 
 
+def _resolve_model(model: str, scope_id: str) -> str:
+    """Resolve virtual 'auto' / empty model to a real MWS model id."""
+    if model and model != "auto":
+        return model
+    return get_last_model(scope_id)
+
+
+_FALLBACK_MODEL = "mws-gpt-alpha"
+
+
 def get_last_model(scope_id: str) -> str:
     meta = read_json(scope_meta_path(scope_id)) or {}
-    return meta.get("last_model", "")
+    model = meta.get("last_model", "") or os.environ.get("CT_DEFAULT_MODEL", _FALLBACK_MODEL)
+    # "auto" — виртуальная модель, MWS не принимает её напрямую.
+    if not model or model == "auto":
+        return os.environ.get("CT_DEFAULT_MODEL", _FALLBACK_MODEL)
+    return model
 
 # ── Compaction constants ─────────────────────────────────────
 
@@ -185,6 +202,7 @@ class ClaudeLikeMemoryRuntime:
         session_id: str,
         scope_id: str,
     ) -> list[dict[str, Any]]:
+        model = _resolve_model(model, scope_id)
         ensure_session_meta(session_id, scope_id=scope_id)
         _save_last_model(scope_id, model)
         query = self._last_user_text(messages)
@@ -229,6 +247,7 @@ class ClaudeLikeMemoryRuntime:
         session_id: str,
         scope_id: str,
     ) -> None:
+        model = _resolve_model(model, scope_id)
         ensure_session_meta(session_id, scope_id=scope_id)
         self._append_transcript(session_id, final_messages)
         self.forks.save_snapshot(
@@ -515,6 +534,13 @@ class ClaudeLikeMemoryRuntime:
             except Exception:
                 _log.exception("extract hook FAILED session=%s scope=%s", session_id, scope_id)
             finally:
+                # Extractor writes files via file_write/file_edit tools, bypassing
+                # write_memory_file(), so MEMORY.md index is never auto-rebuilt.
+                # Rebuild it here after every extract run.
+                try:
+                    rebuild_memory_index(scope_id, force=True)
+                except Exception:
+                    _log.debug("rebuild_memory_index after extract failed scope=%s", scope_id)
                 self._extract_in_progress.discard(session_id)
                 trailing = self._extract_trailing.pop(session_id, None)
                 if trailing is not None:
@@ -551,6 +577,11 @@ class ClaudeLikeMemoryRuntime:
                 )
             except Exception:
                 _log.exception("post hook failed agent=%s session=%s", agent_id, session_id)
+            finally:
+                try:
+                    rebuild_memory_index(scope_id, force=True)
+                except Exception:
+                    pass
 
         try:
             asyncio.get_running_loop().create_task(runner())
@@ -639,7 +670,11 @@ class ClaudeLikeMemoryRuntime:
             "so the efficient strategy is: turn 1 — file_read ALL existing memory files in parallel "
             "(so you can see what's already saved and correct/update it); "
             "turn 2 — issue all file_write/file_edit calls in parallel. "
-            "Do not interleave reads and writes across multiple turns.",
+            "Do not interleave reads and writes across multiple turns.\n\n"
+            "CRITICAL: ONE file per life domain. If a message contains multiple facts about the SAME domain "
+            "(e.g. 'люблю макароны и не люблю брокколи' — both are food), "
+            "combine them into a SINGLE file_write to ONE file (e.g. `user_food.md`). "
+            "NEVER create two files for the same domain. Two facts about food = one file_write.",
             "",
             f"You MUST only use content from the last ~{window} messages to update your persistent memories. "
             "Do not waste any turns attempting to investigate or verify that content further — "

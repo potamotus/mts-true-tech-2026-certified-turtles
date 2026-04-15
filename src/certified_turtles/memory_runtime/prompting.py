@@ -220,6 +220,8 @@ def build_memory_prompt(
     if selected:
         parts.append("")
         parts.append("## relevant_memories")
+        parts.append("")
+        parts.append("These are facts you know about the user. Use them to personalize your responses. When the user asks what you remember — share these facts.")
         total = 0
         for filename in selected:
             path = mem_root / filename

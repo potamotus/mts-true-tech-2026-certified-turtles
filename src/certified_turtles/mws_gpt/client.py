@@ -102,7 +102,7 @@ class MWSGPTClient:
             except TimeoutError as e:
                 raise MWSGPTError(
                     f"Таймаут MWS при {method} {path} (лимит {timeout_sec}s чтения ответа). "
-                    "Попробуйте другую модель, уменьшите контекст или max_tool_rounds.",
+                    "Попробуйте другую модель или уменьшите контекст.",
                     status=504,
                     body=str(e),
                 ) from e
@@ -163,11 +163,50 @@ class MWSGPTClient:
         model: str,
         messages: list[dict[str, Any]],
         **extra: Any,
-    ) -> Iterator[bytes]:
-        """POST /v1/chat/completions with stream=true. Yields raw SSE lines."""
+    ) -> Iterator[dict[str, Any]]:
+        """POST /v1/chat/completions with stream=true. Yields parsed SSE chunk dicts."""
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         body.update(extra)
-        # Remove stream from extra if caller passed it explicitly.
+        body["stream"] = True
+        url = f"{self._base}/v1/chat/completions"
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        headers = self._headers(json_body=True)
+        try:
+            timeout_sec = max(30, min(600, int(os.environ.get("MWS_HTTP_TIMEOUT_SEC", "120"))))
+        except (TypeError, ValueError):
+            timeout_sec = 120
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        try:
+            resp = urllib.request.urlopen(req, timeout=timeout_sec)
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="replace")
+            raise MWSGPTError(e.reason or str(e), status=e.code, body=err_body) from e
+        except (ConnectionError, TimeoutError, socket.timeout, urllib.error.URLError) as e:
+            raise MWSGPTError(f"Streaming connection failed: {e!s}", status=502, body=str(e)) from e
+        try:
+            for raw_line in resp:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line.startswith("data: "):
+                    continue
+                payload = line[6:]
+                if payload == "[DONE]":
+                    break
+                try:
+                    yield json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+        finally:
+            resp.close()
+
+    def chat_completions_stream_raw(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        **extra: Any,
+    ) -> Iterator[bytes]:
+        """POST /v1/chat/completions with stream=true. Yields raw SSE lines (for upstream proxy)."""
+        body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
+        body.update(extra)
         body["stream"] = True
         url = f"{self._base}/v1/chat/completions"
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")

@@ -7,7 +7,12 @@
 	import { getOllamaConfig, updateOllamaConfig } from '$lib/apis/ollama';
 	import { getOpenAIConfig, updateOpenAIConfig, getOpenAIModels } from '$lib/apis/openai';
 	import { getModels as _getModels, getBackendConfig } from '$lib/apis';
-	import { getConnectionsConfig, setConnectionsConfig } from '$lib/apis/configs';
+	import {
+		getConnectionsConfig,
+		setConnectionsConfig,
+		getToolServerConnections,
+		setToolServerConnections
+	} from '$lib/apis/configs';
 
 	import { config, models, settings, user } from '$lib/stores';
 
@@ -19,6 +24,9 @@
 	import OpenAIConnection from './Connections/OpenAIConnection.svelte';
 	import AddConnectionModal from '$lib/components/AddConnectionModal.svelte';
 	import OllamaConnection from './Connections/OllamaConnection.svelte';
+	import MCPMarketplace from './Connections/MCPMarketplace.svelte';
+	import AgentSettings from './Connections/AgentSettings.svelte';
+	import MwsTablesSettings from './Connections/MwsTablesSettings.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -44,6 +52,9 @@
 	let ENABLE_OLLAMA_API: null | boolean = null;
 
 	let connectionsConfig = null;
+
+	let toolServerConnections: any[] = [];
+	let installedUrls: Set<string> = new Set();
 
 	let pipelineUrls = {};
 	let showAddOpenAIConnectionModal = false;
@@ -136,6 +147,25 @@
 		await updateOllamaHandler();
 	};
 
+	const refreshInstalledUrls = () => {
+		installedUrls = new Set(toolServerConnections.map((c: any) => c.url));
+	};
+
+	const mcpInstallHandler = async (connection: any) => {
+		toolServerConnections = [...toolServerConnections, connection];
+		const res = await setToolServerConnections(localStorage.token, {
+			TOOL_SERVER_CONNECTIONS: toolServerConnections
+		}).catch((error) => {
+			toast.error(`${error}`);
+		});
+
+		if (res) {
+			toolServerConnections = res.TOOL_SERVER_CONNECTIONS;
+			refreshInstalledUrls();
+			toast.success($i18n.t('MCP server connected'));
+		}
+	};
+
 	onMount(async () => {
 		if ($user?.role === 'admin') {
 			let ollamaConfig = {};
@@ -150,6 +180,13 @@
 				})(),
 				(async () => {
 					connectionsConfig = await getConnectionsConfig(localStorage.token);
+				})(),
+				(async () => {
+					const res = await getToolServerConnections(localStorage.token);
+					if (res) {
+						toolServerConnections = res.TOOL_SERVER_CONNECTIONS || [];
+						refreshInstalledUrls();
+					}
 				})()
 			]);
 
@@ -361,6 +398,14 @@
 					{/if}
 				</div>
 
+				<AgentSettings />
+
+				<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
+
+				<MwsTablesSettings />
+
+				<hr class="border-gray-100/30 dark:border-gray-850/30 my-2" />
+
 				<div class="my-2">
 					<div class="flex justify-between items-center text-sm">
 						<div class="  font-medium">{$i18n.t('Direct Connections')}</div>
@@ -382,6 +427,20 @@
 							'Direct Connections allow users to connect to their own OpenAI compatible API endpoints.'
 						)}
 					</div>
+				</div>
+
+				<hr class=" border-gray-100/30 dark:border-gray-850/30 my-2" />
+
+				<div class="my-2">
+					<div class="flex justify-between items-center text-sm mb-2">
+						<div class="font-medium">{$i18n.t('MCP Marketplace')}</div>
+					</div>
+
+					<div class="mt-1 text-xs text-gray-400 dark:text-gray-500 mb-2">
+						{$i18n.t('Browse and connect MCP servers from the official registry.')}
+					</div>
+
+					<MCPMarketplace {installedUrls} onInstall={mcpInstallHandler} />
 				</div>
 
 				<hr class=" border-gray-100/30 dark:border-gray-850/30 my-2" />

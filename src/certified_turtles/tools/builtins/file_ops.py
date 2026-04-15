@@ -105,7 +105,7 @@ def _handle_file_read(arguments: dict[str, Any]) -> str:
         partial = False
     else:
         end = min(len(lines), max(offset, 0) + max(int(limit), 0))
-        partial = True
+        partial = max(offset, 0) > 0 or end < len(lines)
     body = "\n".join(f"{i + 1}\t{line}" for i, line in enumerate(lines[offset:end], start=offset))
     stat = path.stat()
     prev = get_file_state(_current_session_id(), path)

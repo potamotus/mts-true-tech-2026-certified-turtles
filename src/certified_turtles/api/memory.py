@@ -184,11 +184,27 @@ async def trigger_dream(scope_id: str = Query(DEFAULT_SCOPE)) -> dict[str, Any]:
     from certified_turtles.memory_runtime.storage import memory_dir as _mem_dir, memory_index_path
     from certified_turtles.mws_gpt.client import DEFAULT_BASE_URL, MWSGPTClient
 
+    from certified_turtles.memory_runtime.forking import CacheSafeSnapshot
+    from certified_turtles.memory_runtime.manager import get_last_model
+    import time as _time
+
     rt = runtime_from_env()
     client = MWSGPTClient(base_url=os.environ.get("MWS_API_BASE", DEFAULT_BASE_URL))
     scope = scope_id
     mem_root = _mem_dir(scope)
     idx_path = memory_index_path(scope)
+
+    # Ensure snapshot exists for the synthetic session so run_named_subagent works.
+    dream_session = "manual-dream"
+    model = get_last_model(scope)
+    rt.forks.save_snapshot(CacheSafeSnapshot(
+        model=model,
+        scope_id=scope,
+        session_id=dream_session,
+        file_state_namespace=dream_session,
+        messages=[],
+        saved_at=_time.time(),
+    ))
 
     rt._launch_post_hook(
         client,

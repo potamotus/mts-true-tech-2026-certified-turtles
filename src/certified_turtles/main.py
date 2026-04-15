@@ -119,9 +119,9 @@ def _summarize_json_body(path: str, data: dict[str, Any]) -> str:
         if ua is not None:
             parts.append(f"use_agent={ua}")
     if path == "/api/v1/agent/chat":
-        mtr = data.get("max_tool_rounds")
-        if mtr is not None:
-            parts.append(f"max_tool_rounds={mtr}")
+        mat = data.get("max_agent_tokens")
+        if mat is not None:
+            parts.append(f"max_agent_tokens={mat}")
     return ", ".join(parts) if parts else ""
 
 

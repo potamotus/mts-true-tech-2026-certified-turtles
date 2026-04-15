@@ -36,14 +36,14 @@ _MODE_ALIASES: dict[str, str] = {
     "slides": "presentation",
 }
 
-_MODE_MAX_ROUNDS: dict[str, int] = {
-    "default": 0,  # 0 = не менять тело запроса
-    "deep_research": 36,
-    "research": 14,
-    "coder": 16,
-    "data_analyst": 18,
-    "writer": 10,
-    "presentation": 14,
+_MODE_MAX_TOKENS: dict[str, int] = {
+    "default": 0,  # 0 = не менять (используется глобальный бюджет из настроек)
+    "deep_research": 0,  # subprocess, не LLM-цикл
+    "research": 0,  # forced agent → бюджет из SubAgentSpec
+    "coder": 200_000,
+    "data_analyst": 250_000,
+    "writer": 0,
+    "presentation": 0,  # forced agent → бюджет из SubAgentSpec
 }
 
 _PREFIX_RE = re.compile(
@@ -57,8 +57,8 @@ class PreparedChatRequest:
     messages: list[dict[str, Any]]
     """Скопированные/изменённые сообщения."""
 
-    max_tool_rounds_override: int | None
-    """Если не None — заменить max_tool_rounds (после clamp в прокси)."""
+    max_total_tokens_override: int | None
+    """Если не None — заменить max_total_tokens (глобальный бюджет из настроек)."""
 
     mode_applied: str | None
     """Какой режим применён (canonical id) или None."""
@@ -73,11 +73,11 @@ def _canonical_mode(raw: str | None) -> str | None:
     key = raw.strip().lower().replace(" ", "_")
     if not key:
         return None
-    return _MODE_ALIASES.get(key, key if key in _MODE_MAX_ROUNDS else None)
+    return _MODE_ALIASES.get(key, key if key in _MODE_MAX_TOKENS else None)
 
 
 def _mode_prompt_path(mode: str) -> str | None:
-    if mode == "default" or mode not in _MODE_MAX_ROUNDS:
+    if mode == "default" or mode not in _MODE_MAX_TOKENS:
         return None
     return f"modes/{mode}.md"
 
@@ -132,7 +132,7 @@ def prepare_chat_request(
         _strip_prefix_from_last_user(out)
         return PreparedChatRequest(
             messages=out,
-            max_tool_rounds_override=None,
+            max_total_tokens_override=None,
             mode_applied=None,
             forced_agent_id=None,
         )
@@ -152,7 +152,7 @@ def prepare_chat_request(
     if not mode or mode == "default":
         return PreparedChatRequest(
             messages=out,
-            max_tool_rounds_override=None,
+            max_total_tokens_override=None,
             mode_applied=None,
             forced_agent_id=None,
         )
@@ -161,7 +161,7 @@ def prepare_chat_request(
     if not path:
         return PreparedChatRequest(
             messages=out,
-            max_tool_rounds_override=None,
+            max_total_tokens_override=None,
             mode_applied=None,
             forced_agent_id=None,
         )
@@ -171,7 +171,7 @@ def prepare_chat_request(
     except OSError:
         return PreparedChatRequest(
             messages=out,
-            max_tool_rounds_override=None,
+            max_total_tokens_override=None,
             mode_applied=None,
             forced_agent_id=None,
         )
@@ -179,11 +179,11 @@ def prepare_chat_request(
     if text:
         _inject_mode_system(out, text)
 
-    rounds = _MODE_MAX_ROUNDS.get(mode, 0)
-    max_override = rounds if rounds > 0 else None
+    tokens = _MODE_MAX_TOKENS.get(mode, 0)
+    max_override = tokens if tokens > 0 else None
     return PreparedChatRequest(
         messages=out,
-        max_tool_rounds_override=max_override,
+        max_total_tokens_override=max_override,
         mode_applied=mode,
         forced_agent_id=_mode_forced_agent_id(mode),
     )
@@ -191,7 +191,7 @@ def prepare_chat_request(
 
 def list_chat_mode_ids() -> list[str]:
     """Идентификаторы режимов для /health и документации (без default)."""
-    return [k for k in sorted(_MODE_MAX_ROUNDS) if k != "default"]
+    return [k for k in sorted(_MODE_MAX_TOKENS) if k != "default"]
 
 
 def canonical_mode_ids() -> frozenset[str]:

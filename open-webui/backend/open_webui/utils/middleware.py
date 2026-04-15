@@ -2310,6 +2310,20 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         # Client side tools
         direct_tool_servers = metadata.get("tool_servers", None)
 
+        # Auto-inject enabled MCP servers when no tools selected
+        if not tool_ids:
+            tool_ids = []
+            for conn in request.app.state.config.TOOL_SERVER_CONNECTIONS:
+                if (
+                    conn.get("type") == "mcp"
+                    and conn.get("config", {}).get("enable", True)
+                ):
+                    server_id = conn.get("info", {}).get("id")
+                    if server_id:
+                        tool_ids.append(f"server:mcp:{server_id}")
+            if not tool_ids:
+                tool_ids = None
+
         log.debug(f"{tool_ids=}")
         log.debug(f"{direct_tool_servers=}")
 

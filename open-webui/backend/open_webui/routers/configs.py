@@ -134,6 +134,67 @@ async def register_oauth_client(
 
 
 ############################
+# MCP Registry Proxy
+############################
+
+
+@router.get("/mcp_registry")
+async def get_mcp_registry_servers(
+    search: str = "",
+    cursor: str = "",
+    limit: int = 20,
+    user=Depends(get_admin_user),
+):
+    params = {"limit": limit}
+    if search:
+        params["search"] = search
+    if cursor:
+        params["cursor"] = cursor
+
+    try:
+        async with aiohttp.ClientSession(
+            trust_env=True,
+            timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+        ) as session:
+            async with session.get(
+                "https://registry.modelcontextprotocol.io/v0.1/servers",
+                params=params,
+            ) as resp:
+                if resp.status != 200:
+                    raise HTTPException(
+                        status_code=resp.status,
+                        detail="Failed to fetch MCP registry",
+                    )
+                data = await resp.json()
+
+        # Filter: only latest versions with remotes
+        servers = []
+        for entry in data.get("servers", []):
+            meta = entry.get("_meta", {}).get(
+                "io.modelcontextprotocol.registry/official", {}
+            )
+            if not meta.get("isLatest", False):
+                continue
+            server = entry.get("server", {})
+            if not server.get("remotes"):
+                continue
+            servers.append(entry)
+
+        return {
+            "servers": servers,
+            "metadata": data.get("metadata", {}),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.debug(f"Failed to fetch MCP registry: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch MCP registry",
+        )
+
+
+############################
 # ToolServers Config
 ############################
 
